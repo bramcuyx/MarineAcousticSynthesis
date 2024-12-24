@@ -92,8 +92,6 @@ class Event:
         self.end_pos = None
         self.scaled_data = None
         self.class_label = os.path.basename(file_path).split('_')[0]
-        self.binary_mask = None
-
 
     def scale_to_snr(self, background_segment, snr):
         """Scale the event audio to achieve the specified SNR when mixed with background."""
@@ -101,20 +99,8 @@ class Event:
         noise_power = np.mean(background_segment ** 2)
         scaling_factor = np.sqrt(noise_power / (10 ** (snr / 10)) / signal_power)
         self.scaled_data = self.audio_file.data * scaling_factor
-    
-    def generate_binary_mask(self):
-        """
-        Generate a binary mask for the event's spectrogram.
 
-        Returns:
-            numpy.ndarray: The binary mask of the event's spectrogram.
-        """
-        f, t, Sxx = spectrogram(self.audio_file.data, self.audio_file.sample_rate)
-        self.binary_mask = (Sxx > np.median(Sxx)).astype(int)
-        return self.binary_mask
-    
-
-
+  
 class MetadataManager:
     """
     Manages metadata for audio events.
@@ -173,6 +159,7 @@ class AudioSimulator:
     
         background_folder (str): The path to the folder containing background audio files.
         events_folder (str): The path to the folder containing event audio files.
+        mask_folder (str): The path to the folder containing binary mask files.
         output_folder (str): The path to the output folder.
         sample_rate (int): The sampling rate of the audio files.
         duration (int): The duration of the audio files in seconds.
@@ -186,14 +173,15 @@ class AudioSimulator:
         
     Usage:
     
-        simulator = AudioSimulator(background_folder, events_folder, output_folder, sample_rate, duration)
+        simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
         simulator.simulate_audio(snr, num_events, mask_generator)
         
     """
 
-    def __init__(self, background_folder, events_folder, output_folder, sample_rate=48000, duration=10):
+    def __init__(self, background_folder, events_folder, mask_folder, output_folder, sample_rate=48000, duration=10):
         self.background_folder = background_folder
         self.events_folder = events_folder
+        self.mask_folder = mask_folder
         self.output_folder = output_folder
         self.sample_rate = sample_rate
         self.duration = duration
@@ -215,7 +203,23 @@ class AudioSimulator:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
         return random.choice(files)
 
-    def simulate_audio(self, snr, num_events, mask_generator=None):
+    def _get_corresponding_mask(self, event_file):
+        """
+        Get the corresponding mask file for the given event file.
+
+        Args:
+            event_file (str): The path to the event file.
+
+        Returns:
+            str: The path to the mask file.
+        """
+        event_name = os.path.splitext(os.path.basename(event_file))[0]
+        mask_file = os.path.join(self.mask_folder, f"{event_name}.npy")
+        if not os.path.exists(mask_file):
+            raise FileNotFoundError(f"Mask file for {event_name} not found in {self.mask_folder}.")
+        return mask_file
+
+    def simulate_audio(self, snr, num_events):
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
@@ -231,6 +235,8 @@ class AudioSimulator:
         # Generate events and embed them into the background
         event_positions = []
         output_audio = background.copy()
+        aggregate_mask = np.zeros((int(self.bg_length / (self.sample_rate / 1000)),))
+
         for _ in range(num_events):
             event_file = self._select_random_file(self.events_folder)
             event = Event(event_file, self.sample_rate)
@@ -246,14 +252,19 @@ class AudioSimulator:
             event.scale_to_snr(background[start_pos:end_pos], snr)
             output_audio[start_pos:end_pos] += event.scaled_data
 
+            # Load and process corresponding mask
+            mask_file = self._get_corresponding_mask(event_file)
+            event_mask = np.load(mask_file)
+
+            # Aggregate the mask for the audio file
+            aggregate_mask[start_pos:end_pos] = np.maximum(aggregate_mask[start_pos:end_pos], event_mask[:end_pos - start_pos])
+
             # Record event metadata
             metadata_manager.add_event(event, start_pos / self.sample_rate, end_pos / self.sample_rate)
             event_positions.append((start_pos, end_pos))
 
-        # Generate mask if a mask generator is provided
-        if mask_generator:
-            mask = mask_generator(event_positions, self.bg_length)
-            metadata_manager.metadata["mask"] = mask
+        # Add the aggregated mask to metadata
+        metadata_manager.metadata["mask"] = aggregate_mask.tolist()
 
         # Use the unique ID for output filenames
         output_audio_filename = f"simulated_audio_{self.unique_id}.wav"
@@ -297,6 +308,7 @@ class DataSet:
     def __init__(self, background_folder, events_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length, sample_rate=48000):
         self.background_folder = background_folder
         self.events_folder = events_folder
+        self.mask_folder = mask_folder
         self.output_folder = output_folder
         self.lowest_snr = lowest_snr
         self.highest_snr = highest_snr
@@ -313,6 +325,7 @@ class DataSet:
                 simulator = AudioSimulator(
                     background_folder=self.background_folder,
                     events_folder=self.events_folder,
+                    mask_folder=self.mask_folder,
                     output_folder=self.output_folder,
                     sample_rate=self.sample_rate,
                     duration=self.file_length
@@ -325,10 +338,29 @@ class DataSet:
         for audio_file, metadata_file in self.generated_files:
             with open(metadata_file, "r") as f:
                 metadata = json.load(f)
-            rows.append({
-                "audio_file": audio_file,
-                "snr": metadata["snr"],
-                "background_file": metadata["background_file"],
-                "events": metadata["events"]
-            })
-        return pd.DataFrame(rows)
+
+            # Extract relevant information
+            snr = metadata.get("snr")
+            sample_rate = metadata.get("sample_rate")
+            duration = metadata.get("duration")
+            background_file = metadata.get("background_file")
+            events = metadata.get("events", [])
+            mask = metadata.get("mask", [])
+
+            for event in events:
+                rows.append({
+                    "audio_file": audio_file,
+                    "snr": snr,
+                    "sample_rate": sample_rate,
+                    "duration": duration,
+                    "background_file": background_file,
+                    "event_file": event.get("event_file"),
+                    "event_start": event.get("start"),
+                    "event_end": event.get("end"),
+                    "event_class": event.get("class"),
+                    "mask": mask  # Add the full mask as part of the row
+                })
+
+        # Convert rows to a pandas DataFrame
+        dataframe = pd.DataFrame(rows)
+        return dataframe
