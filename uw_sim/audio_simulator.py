@@ -220,6 +220,18 @@ class AudioSimulator:
         return mask_file
 
     def simulate_audio(self, snr, num_events):
+        '''
+        Simulate audio with the specified SNR and number of events.
+
+        Args:
+            snr (int): The signal-to-noise ratio.
+            num_events (int): The number of events to simulate.
+            
+        Returns:
+            str: The path to the output audio file.
+            str: The path to the metadata file.
+
+        '''
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
@@ -310,7 +322,7 @@ class DataSet:
         df = dataset.generate_dataframe()
         
     """
-    def __init__(self, background_folder, events_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length, sample_rate=48000):
+    def __init__(self, background_folder, events_folder, mask_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length, sample_rate=48000):
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
@@ -352,19 +364,23 @@ class DataSet:
             events = metadata.get("events", [])
             mask = metadata.get("mask", [])
 
-            for event in events:
-                rows.append({
-                    "audio_file": audio_file,
-                    "snr": snr,
-                    "sample_rate": sample_rate,
-                    "duration": duration,
-                    "background_file": background_file,
-                    "event_file": event.get("event_file"),
-                    "event_start": event.get("start"),
-                    "event_end": event.get("end"),
-                    "event_class": event.get("class"),
-                    "mask": mask  # Add the full mask as part of the row
-                })
+            event_files = [event.get("event_file") for event in events]
+            event_starts = [event.get("start") for event in events]
+            event_ends = [event.get("end") for event in events]
+            event_classes = [event.get("class") for event in events]
+
+            rows.append({
+                "audio_file": audio_file,
+                "snr": snr,
+                "sample_rate": sample_rate,
+                "duration": duration,
+                "background_file": background_file,
+                "event_files": event_files,
+                "event_starts": event_starts,
+                "event_ends": event_ends,
+                "event_classes": event_classes,
+                "mask": mask  # Add the full mask as part of the row`
+            })
 
         # Convert rows to a pandas DataFrame
         dataframe = pd.DataFrame(rows)
