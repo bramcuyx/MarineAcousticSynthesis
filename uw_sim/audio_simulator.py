@@ -8,13 +8,12 @@ Classes:
     AudioFile: Represents an audio file and provides methods to manipulate it.
     Event: Represents an audio event and provides methods to scale it to a specified SNR.
     MetadataManager: Manages metadata for audio events.
+    AudioSimulator: Simulates audio files with different SNR values.
+    DataSet: Generates a dataset of simulated audio files for a range of SNR values.
 
 Usage:
-    audio_file = AudioFile(file_path, sample_rate)
-    event = Event(file_path, sample_rate)
-    event.scale_to_snr(background_segment, snr)
-    metadata_manager = MetadataManager()
-    
+    simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
+    dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
 """
 import os
 import random
@@ -58,8 +57,7 @@ class AudioFile:
             self.data = self.data[start_idx:start_idx + target_length]
         else:
             # TODO: needs to be changed to pad with the audi itself
-            
-            self.data = np.pad(self.data, (0, target_length - len(self.data)))
+            self.data = np.pad(self.data, (0, target_length - len(self.data)), mode='symmetric')
         return self.data
 
 
@@ -97,7 +95,7 @@ class Event:
         scaling_factor = np.sqrt(noise_power / (10 ** (snr / 10)) / signal_power)
         self.scaled_data = self.audio_file.data * scaling_factor
 
-  
+
 class MetadataManager:
     """
     Manages metadata for audio events.
@@ -120,6 +118,7 @@ class MetadataManager:
     
     def __init__(self):
         self.metadata = {
+            "uuid": None,
             "snr": None,
             "sample_rate": None,
             "duration": None,
@@ -139,8 +138,8 @@ class MetadataManager:
         self.metadata.update({
             "snr": snr,
             "sample_rate": sample_rate,
-            "duration": duration,
-            "background_file": background_file
+            "background_file": background_file,
+            "duration": duration
         })
 
     def save_metadata(self, output_path):
@@ -153,7 +152,6 @@ class AudioSimulator:
     Simulates audio files with different signal-to-noise ratios (SNR).
     
     Attributes:
-    
         background_folder (str): The path to the folder containing background audio files.
         events_folder (str): The path to the folder containing event audio files.
         mask_folder (str): The path to the folder containing binary mask files.
@@ -164,17 +162,13 @@ class AudioSimulator:
         unique_id (str): A unique identifier for the simulation.
         
     Methods:
-    
         _select_random_file(folder): Select a random file from the specified folder.
-        simulate_audio(snr, num_events, mask_generator): Simulate audio with the specified SNR and number of events.
+        simulate_audio(snr, num_events): Simulate audio with the specified SNR and number of events.
         
     Usage:
-    
         simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
-        simulator.simulate_audio(snr, num_events, mask_generator)
-        
+        simulator.simulate_audio(snr, num_events)
     """
-
     def __init__(self, background_folder, events_folder, mask_folder, output_folder, sample_rate=48000, duration=10):
         self.background_folder = background_folder
         self.events_folder = events_folder
@@ -186,7 +180,7 @@ class AudioSimulator:
         self.unique_id = str(uuid.uuid4())
 
     def _select_random_file(self, folder):
-        '''
+        """
         Select a random file from the specified folder.
         
         Args:
@@ -194,7 +188,7 @@ class AudioSimulator:
             
         Returns:
             str: The path to the selected file.
-        '''
+        """
         files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.wav')]
         if not files:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
@@ -217,7 +211,7 @@ class AudioSimulator:
         return mask_file
 
     def simulate_audio(self, snr, num_events):
-        '''
+        """
         Simulate audio with the specified SNR and number of events.
 
         Args:
@@ -227,8 +221,7 @@ class AudioSimulator:
         Returns:
             str: The path to the output audio file.
             str: The path to the metadata file.
-
-        '''
+        """
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
@@ -240,9 +233,10 @@ class AudioSimulator:
         # Prepare metadata
         metadata_manager = MetadataManager()
         metadata_manager.set_global_metadata(snr, self.sample_rate, self.duration, background_file)
+        # Add the full unique_id to metadata
+        metadata_manager.metadata["uuid"] = self.unique_id
 
         # Generate events and embed them into the background
-        event_positions = []
         output_audio = background.copy()
         aggregate_mask = np.zeros((int(self.bg_length / (self.sample_rate / 1000)),))
 
@@ -264,20 +258,21 @@ class AudioSimulator:
             # Load and process corresponding mask
             mask_file = self._get_corresponding_mask(event_file)
             event_mask = np.load(mask_file)
-
-            # Aggregate the mask for the audio file
-            aggregate_mask[start_pos:end_pos] = np.maximum(aggregate_mask[start_pos:end_pos], event_mask[:end_pos - start_pos])
+            aggregate_mask[start_pos:end_pos] = np.maximum(
+                aggregate_mask[start_pos:end_pos],
+                event_mask[:end_pos - start_pos]
+            )
 
             # Record event metadata
             metadata_manager.add_event(event, start_pos / self.sample_rate, end_pos / self.sample_rate)
-            event_positions.append((start_pos, end_pos))
 
         # Add the aggregated mask to metadata
         metadata_manager.metadata["mask"] = aggregate_mask.tolist()
 
-        # Use the unique ID for output filenames
-        output_audio_filename = f"simulated_audio_{self.unique_id}.wav"
-        metadata_filename = f"metadata_{self.unique_id}.json"
+        # Shorten, remove dashes, and use it in filenames
+        shortened_uuid = self.unique_id.replace('-', '')[:8]
+        output_audio_filename = f"simulated_audio_{shortened_uuid}.wav"
+        metadata_filename = f"metadata_{shortened_uuid}.json"
 
         # Save output audio
         output_file = os.path.join(self.output_folder, output_audio_filename)
@@ -289,12 +284,12 @@ class AudioSimulator:
 
         return output_file, metadata_file
 
+
 class DataSet:
     """
     Generates a dataset of simulated audio files with different signal-to-noise ratios (SNR).
     
     Attributes:
-
         background_folder (str): The path to the folder containing background audio files.
         events_folder (str): The path to the folder containing event audio files.
         mask_folder (str): The path to the folder containing binary mask files.
@@ -308,18 +303,17 @@ class DataSet:
         generated_files (list): A list to store the paths of generated audio and metadata files.
         
     Methods:
-    
         generate(): Generate the dataset.
         generate_dataframe(): Generate a pandas DataFrame from the generated files.
         
     Usage:
-            
-        dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length)
+        dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
         dataset.generate()
         df = dataset.generate_dataframe()
-        
     """
-    def __init__(self, background_folder, events_folder, mask_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length, sample_rate=48000):
+    def __init__(self, background_folder, events_folder, mask_folder, output_folder,
+                 lowest_snr, highest_snr, snr_steps, files_per_snr, file_length,
+                 sample_rate=48000):
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
@@ -344,7 +338,10 @@ class DataSet:
                     sample_rate=self.sample_rate,
                     duration=self.file_length
                 )
-                audio_file, metadata_file = simulator.simulate_audio(snr=snr, num_events=random.randint(1, 5))
+                audio_file, metadata_file = simulator.simulate_audio(
+                    snr=snr,
+                    num_events=random.randint(1, 5)
+                )
                 self.generated_files.append((audio_file, metadata_file))
 
     def generate_dataframe(self):
@@ -353,13 +350,13 @@ class DataSet:
             with open(metadata_file, "r") as f:
                 metadata = json.load(f)
 
-            # Extract relevant information
             snr = metadata.get("snr")
             sample_rate = metadata.get("sample_rate")
             duration = metadata.get("duration")
             background_file = metadata.get("background_file")
             events = metadata.get("events", [])
             mask = metadata.get("mask", [])
+            unique_id = metadata.get("uuid", "")
 
             event_files = [event.get("event_file") for event in events]
             event_starts = [event.get("start") for event in events]
@@ -376,9 +373,9 @@ class DataSet:
                 "event_starts": event_starts,
                 "event_ends": event_ends,
                 "event_classes": event_classes,
-                "mask": mask  # Add the full mask as part of the row`
+                "mask": mask,
+                "uuid": unique_id
             })
 
-        # Convert rows to a pandas DataFrame
         dataframe = pd.DataFrame(rows)
         return dataframe
