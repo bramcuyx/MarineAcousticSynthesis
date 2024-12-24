@@ -288,10 +288,15 @@ class DataSet:
 
         background_folder (str): The path to the folder containing background audio files.
         events_folder (str): The path to the folder containing event audio files.
+        mask_folder (str): The path to the folder containing binary mask files.
         output_folder (str): The path to the output folder.
         lowest_snr (int): The lowest SNR value.
         highest_snr (int): The highest SNR value.
         snr_steps (int): The SNR step size.
+        files_per_snr (int): The number of files to generate per SNR value.
+        file_length (int): The length of the audio files in seconds.
+        sample_rate (int): The sampling rate of the audio files.
+        generated_files (list): A list to store the paths of generated audio and metadata files.
         
     Methods:
     
@@ -300,9 +305,9 @@ class DataSet:
         
     Usage:
             
-        dataset = DataSet(background_folder, events_folder, output_folder, lowest_snr, highest_snr, snr_steps)
+        dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length)
         dataset.generate()
-        df = dataset.generate_dataframe
+        df = dataset.generate_dataframe()
         
     """
     def __init__(self, background_folder, events_folder, output_folder, lowest_snr, highest_snr, snr_steps, files_per_snr, file_length, sample_rate=48000):
