@@ -14,6 +14,15 @@ Classes:
 Usage:
     simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
     dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
+    
+Status: In development
+
+TODO: Fill a folder with the backgrounds
+TODO: Fill a folder with the events
+TODO: Calculate the Masks spectrogram shaped with 256 fft bins and 128 hop length
+
+Author: Bram Cuyx
+    
 """
 import os
 import random
@@ -71,6 +80,7 @@ class Event:
         end_pos (int): The end position of the event in the background.
         scaled_data (np.array): The scaled audio data of the event.
         class_label (str): The class label of the event.
+        mask (np.array): The mask of the event.
         
     Methods:
         scale_to_snr(background_segment, snr): Scale the event audio to achieve the specified SNR when mixed with background.
@@ -83,15 +93,77 @@ class Event:
     
     def __init__(self, file_path, sample_rate):
         self.audio_file = AudioFile(file_path, sample_rate)
+        self.sample_rate = sample_rate
         self.start_pos = None
         self.end_pos = None
         self.scaled_data = None
         self.class_label = os.path.basename(file_path).split('_')[0]
+        self.mask = None
 
+    def _get_corresponding_mask(self):
+        """
+        Get the corresponding mask file for the given event file.
+
+        Args:
+            event_file (str): The path to the event file.
+
+        Returns:
+            str: The path to the mask file.
+        """
+        event_name = os.path.splitext(os.path.basename(self.audio_file.file_path))[0]
+        mask_file = os.path.join(self.mask_folder, f"{event_name}.npy")
+        if not os.path.exists(mask_file):
+            raise FileNotFoundError(f"Mask file for {event_name} not found in {self.mask_folder}.")
+        return mask_file
+    ## get Noise and signal power in the spectrogram domain
+    
+    def _get_spectrogram(self, data):
+        """
+        Get the spectrogram of the audio data.
+        
+        Args:
+            background_segment (np.array): The background segment.
+
+        Returns:
+            np.array: The noise spectrogram.
+        """
+        __, __, Sxx = spectrogram(data, fs=self.sample_rate, nperseg=256, noverlap=128) 
+        return Sxx
+    
+
+    def _get_event_power(self):
+        """
+        Get the power of the event audio in the spectrogram domain, where mask is 1.
+
+        Returns:
+            float: The power of the event audio.
+        """
+        Sxx = self._get_spectrogram(self.audio_file.data)
+                
+        return np.mean(Sxx ** 2, where=self.mask)
+ 
+    def _get_noise_power(self, background_segment):
+        """
+        Get the power of the noise in the spectrogram domain, where mask is 1.
+
+        Args:
+            background_segment (np.array): The background segment.
+
+        Returns:
+            float: The power of the noise.
+        """
+        noise_spectrogram = self._get_spectrogram(background_segment)
+        return np.mean(noise_spectrogram ** 2, where=self.mask)
+    
     def scale_to_snr(self, background_segment, snr):
         """Scale the event audio to achieve the specified SNR when mixed with background."""
-        signal_power = np.mean(self.audio_file.data ** 2)
-        noise_power = np.mean(background_segment ** 2)
+        # TODO: scale based on the mask as well 
+        self.mask = self._get_corresponding_mask()
+        
+        
+        
+        signal_power = self._get_event_power()
+        noise_power = self._get_noise_power(background_segment)
         scaling_factor = np.sqrt(noise_power / (10 ** (snr / 10)) / signal_power)
         self.scaled_data = self.audio_file.data * scaling_factor
 
@@ -194,21 +266,6 @@ class AudioSimulator:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
         return random.choice(files)
 
-    def _get_corresponding_mask(self, event_file):
-        """
-        Get the corresponding mask file for the given event file.
-
-        Args:
-            event_file (str): The path to the event file.
-
-        Returns:
-            str: The path to the mask file.
-        """
-        event_name = os.path.splitext(os.path.basename(event_file))[0]
-        mask_file = os.path.join(self.mask_folder, f"{event_name}.npy")
-        if not os.path.exists(mask_file):
-            raise FileNotFoundError(f"Mask file for {event_name} not found in {self.mask_folder}.")
-        return mask_file
 
     def simulate_audio(self, snr, num_events):
         """
@@ -238,7 +295,7 @@ class AudioSimulator:
 
         # Generate events and embed them into the background
         output_audio = background.copy()
-        aggregate_mask = np.zeros((int(self.bg_length / (self.sample_rate / 1000)),))
+        aggregate_mask = np.zeros((129, len(output_audio) // 128 + 1)) # 129 is the number of frequency bins in the spectrogram, 128 is the hop length
 
         for _ in range(num_events):
             event_file = self._select_random_file(self.events_folder)
@@ -257,17 +314,21 @@ class AudioSimulator:
 
             # Load and process corresponding mask
             mask_file = self._get_corresponding_mask(event_file)
-            event_mask = np.load(mask_file)
-            aggregate_mask[start_pos:end_pos] = np.maximum(
-                aggregate_mask[start_pos:end_pos],
-                event_mask[:end_pos - start_pos]
-            )
-
+            event_mask = np.load(mask_file) # Allow for 2d masks
+            
+            # Translate start_pos in samples to start_pos in spectrogram bins
+            start_pos_spec = start_pos // 128
+            end_pos_spec = end_pos // 128
+            
+            # Update the aggregate mask
+            aggregate_mask[:, start_pos_spec:end_pos_spec] += event_mask
+            aggregate_mask = np.clip(aggregate_mask, 0, 1)
+        
             # Record event metadata
             metadata_manager.add_event(event, start_pos / self.sample_rate, end_pos / self.sample_rate)
 
         # Add the aggregated mask to metadata
-        metadata_manager.metadata["mask"] = aggregate_mask.tolist()
+        metadata_manager.metadata["mask"] = aggregate_mask
 
         # Shorten, remove dashes, and use it in filenames
         shortened_uuid = self.unique_id.replace('-', '')[:8]
