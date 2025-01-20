@@ -19,7 +19,7 @@ poetry install
 
 ## Usage
 ### AudioSimulator
-The `AudioSimulator` class is used to simulate underwater audio events.
+The `AudioSimulator` class is used to simulate underwater audio files.
 
 ```python
     from uw_sim.audio_simulator import AudioSimulator
