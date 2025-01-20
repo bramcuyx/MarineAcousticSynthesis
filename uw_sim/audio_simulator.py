@@ -69,7 +69,6 @@ class AudioFile:
             start_idx = random.randint(0, len(self.data) - target_length)
             self.data = self.data[start_idx : start_idx + target_length]
         else:
-            # TODO: needs to be changed to pad with the audi itself
             self.data = np.pad(
                 self.data, (0, target_length - len(self.data)), mode="symmetric"
             )
@@ -131,7 +130,7 @@ class Event:
         Get the spectrogram of the audio data.
 
         Args:
-            background_segment (np.array): The background segment.
+            data (np.array): The audio data.
 
         Returns:
             np.array: The noise spectrogram.
@@ -165,7 +164,6 @@ class Event:
 
     def scale_to_snr(self, background_segment, snr):
         """Scale the event audio to achieve the specified SNR when mixed with background."""
-        # TODO: scale based on the mask as well
         self.mask = self._get_corresponding_mask()
 
         signal_power = self._get_event_power()
