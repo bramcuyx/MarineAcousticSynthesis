@@ -18,6 +18,8 @@ matplotlib = ">=3.4.0"
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
 ipykernel = "^6.29.5"
+ipympl = "^0.9.6"
+dearpygui = "^2.0.0"
 
 [build-system]
 requires = ["poetry-core"]

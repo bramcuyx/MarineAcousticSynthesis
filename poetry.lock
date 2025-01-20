@@ -282,6 +282,37 @@ docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
+name = "dearpygui"
+version = "2.0.0"
+description = "DearPyGui: A simple Python GUI Toolkit"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "dearpygui-2.0.0-cp310-cp310-macosx_10_6_x86_64.whl", hash = "sha256:6126eec4217de6dfbe0aef4b96a0f4b385f85dab538ee806d51c5f9a5ba77c6b"},
+    {file = "dearpygui-2.0.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:340ddc3884740aabcddf696f984c1ff2a06b91050bf5030ab264dc9908f1329a"},
+    {file = "dearpygui-2.0.0-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:68f749fcd36ffc9cef399fb64b0dab5a4075c63574150a163208f8204f778859"},
+    {file = "dearpygui-2.0.0-cp310-cp310-win_amd64.whl", hash = "sha256:d287233603338a811b59da0af8194ff7cd7b8da768c1d056fe17b6d8a7b36a6f"},
+    {file = "dearpygui-2.0.0-cp311-cp311-macosx_10_6_x86_64.whl", hash = "sha256:ee81dd58b06161b5098e11fce5514f621f1fe7670c63711a4397cb1bc108dfe5"},
+    {file = "dearpygui-2.0.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:5802886d4c44362764882b9339a0dbe85f9b445a98560f791acb164febc4df32"},
+    {file = "dearpygui-2.0.0-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:8d5049aa54835a51cc304752a0831ad71a6ca05ee7a33e0b82f7e7e8c8ecda21"},
+    {file = "dearpygui-2.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:73643b3528dd4b03cb22ad64afe960dc8ddd3023f211fd405eabb861fc4dd129"},
+    {file = "dearpygui-2.0.0-cp312-cp312-macosx_10_6_x86_64.whl", hash = "sha256:f0383d74f628ae4622863afff84ab262c9f5163a769836eb470c7243dc9ced0c"},
+    {file = "dearpygui-2.0.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:52c32da6911881564b6cbd95e110d6956095f7a417d2e0c12dcda8274c4fbe72"},
+    {file = "dearpygui-2.0.0-cp312-cp312-manylinux1_x86_64.whl", hash = "sha256:d27f7e64a282c7f0c1387003ec3b247b2c3c1583aea9427283633ad508aa2da6"},
+    {file = "dearpygui-2.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:29881d01e5d0cce0980a8d8b9761c74ff2f30d16aa800e6002a244bbc894b34e"},
+    {file = "dearpygui-2.0.0-cp313-cp313-macosx_10_6_x86_64.whl", hash = "sha256:3bf0aa19baedb4f130b8de636d4644740ffd9b7008481794c574bf59240808dc"},
+    {file = "dearpygui-2.0.0-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:ae6fc9aa3390b29387c2bc2bf3ac7a92c10eae2b479818171864fc29a7de344e"},
+    {file = "dearpygui-2.0.0-cp313-cp313-manylinux1_x86_64.whl", hash = "sha256:f02b0ab56700a775d7e6446e3c424d5bed3386efe721a04518d02461851daadf"},
+    {file = "dearpygui-2.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:e3d52057f49773b10808962806711c3b3119e829d36407afb84ad50522edc9b0"},
+    {file = "dearpygui-2.0.0-cp38-cp38-macosx_10_6_x86_64.whl", hash = "sha256:3aaa549d7e9b4b9e591cd785f9cdbe3650fea724ee099f774e066ad97c374c55"},
+    {file = "dearpygui-2.0.0-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:400b0a209674dfaf3e223b5465838e1d9fd25102203eed81518ff842f9caf7f1"},
+    {file = "dearpygui-2.0.0-cp38-cp38-win_amd64.whl", hash = "sha256:52cabe531449804b35e1ac36e48e1cf9b784b1c1752395dabf95df8d607fc2d8"},
+    {file = "dearpygui-2.0.0-cp39-cp39-macosx_10_6_x86_64.whl", hash = "sha256:751f58355631924b17b543db1c366d69ca056f050556952c23e051ebd1a8ac76"},
+    {file = "dearpygui-2.0.0-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:9a3f0562d47e664c044bcb75868d7f3cc22456866f32f6b4bad22e377d4eef3a"},
+    {file = "dearpygui-2.0.0-cp39-cp39-win_amd64.whl", hash = "sha256:ffe10b14f836cea82881fb9f66e464877429ce3ff2fbc3e33d239881cd52bada"},
+]
+
+[[package]]
 name = "debugpy"
 version = "1.8.12"
 description = "An implementation of the Debug Adapter Protocol for Python"
@@ -462,6 +493,28 @@ pyside6 = ["pyside6"]
 test = ["flaky", "ipyparallel", "pre-commit", "pytest (>=7.0)", "pytest-asyncio (>=0.23.5)", "pytest-cov", "pytest-timeout"]
 
 [[package]]
+name = "ipympl"
+version = "0.9.6"
+description = "Matplotlib Jupyter Extension"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "ipympl-0.9.6-py3-none-any.whl", hash = "sha256:c4afdf95eac244d067550934574061bafd1446bf31af42b6e9f6750cb97f2446"},
+    {file = "ipympl-0.9.6.tar.gz", hash = "sha256:51c762550a55e64f9c97b42fbcc7076879f696fb44761f5ebaf6f79821ea918f"},
+]
+
+[package.dependencies]
+ipython = "<9"
+ipywidgets = ">=7.6.0,<9"
+matplotlib = ">=3.5.0,<4"
+numpy = "*"
+pillow = "*"
+traitlets = "<6"
+
+[package.extras]
+docs = ["myst-nb", "sphinx (>=1.5)", "sphinx-book-theme", "sphinx-copybutton", "sphinx-thebe", "sphinx-togglebutton"]
+
+[[package]]
 name = "ipython"
 version = "8.31.0"
 description = "IPython: Productive Interactive Computing"
@@ -498,6 +551,27 @@ parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
 test = ["packaging", "pickleshare", "pytest", "pytest-asyncio (<0.22)", "testpath"]
 test-extra = ["curio", "ipython[test]", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.23)", "pandas", "trio"]
+
+[[package]]
+name = "ipywidgets"
+version = "8.1.5"
+description = "Jupyter interactive widgets"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "ipywidgets-8.1.5-py3-none-any.whl", hash = "sha256:3290f526f87ae6e77655555baba4f36681c555b8bdbbff430b70e52c34c86245"},
+    {file = "ipywidgets-8.1.5.tar.gz", hash = "sha256:870e43b1a35656a80c18c9503bbf2d16802db1cb487eec6fab27d683381dde17"},
+]
+
+[package.dependencies]
+comm = ">=0.1.3"
+ipython = ">=6.1.0"
+jupyterlab-widgets = ">=3.0.12,<3.1.0"
+traitlets = ">=4.3.1"
+widgetsnbextension = ">=4.0.12,<4.1.0"
+
+[package.extras]
+test = ["ipykernel", "jsonschema", "pytest (>=3.6.0)", "pytest-cov", "pytz"]
 
 [[package]]
 name = "jedi"
@@ -559,6 +633,17 @@ traitlets = ">=5.3"
 [package.extras]
 docs = ["myst-parser", "pydata-sphinx-theme", "sphinx-autodoc-typehints", "sphinxcontrib-github-alt", "sphinxcontrib-spelling", "traitlets"]
 test = ["ipykernel", "pre-commit", "pytest (<8)", "pytest-cov", "pytest-timeout"]
+
+[[package]]
+name = "jupyterlab-widgets"
+version = "3.0.13"
+description = "Jupyter interactive widgets for JupyterLab"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "jupyterlab_widgets-3.0.13-py3-none-any.whl", hash = "sha256:e3cda2c233ce144192f1e29914ad522b2f4c40e77214b0cc97377ca3d323db54"},
+    {file = "jupyterlab_widgets-3.0.13.tar.gz", hash = "sha256:a2966d385328c1942b683a8cd96b89b8dd82c8b8f81dda902bb2bc06d46f5bed"},
+]
 
 [[package]]
 name = "kiwisolver"
@@ -1547,7 +1632,18 @@ files = [
     {file = "wcwidth-0.2.13.tar.gz", hash = "sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5"},
 ]
 
+[[package]]
+name = "widgetsnbextension"
+version = "4.0.13"
+description = "Jupyter interactive widgets for Jupyter Notebook"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "widgetsnbextension-4.0.13-py3-none-any.whl", hash = "sha256:74b2692e8500525cc38c2b877236ba51d34541e6385eeed5aec15a70f88a6c71"},
+    {file = "widgetsnbextension-4.0.13.tar.gz", hash = "sha256:ffcb67bc9febd10234a362795f643927f4e0c05d9342c727b65d2384f8feacb6"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "1fd344e7c3584ed7700298dc252bbf2f70cb5cc2b4370d43eaf959530ab44b69"
+content-hash = "7f5d667bb79cfb6349b701f7fbc16126326b43eb88aa8c0272e3660c1fcd6150"
