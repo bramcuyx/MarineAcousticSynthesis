@@ -40,3 +40,4 @@ htmlcov/
 # Output folders
 output/
 Generate_sourcefiles/
+chosen_rows/
