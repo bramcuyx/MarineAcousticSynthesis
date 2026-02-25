@@ -14,7 +14,7 @@ UW-Sim is a Python package for simulating underwater audio events and managing m
 To install the dependencies, use [Poetry](https://python-poetry.org/):
 
 ```sh
-poetry install 
+poetry install
 ```
 
 ## Usage
@@ -41,7 +41,7 @@ The `AudioSimulator` class is used to simulate underwater audio files.
 
 The `DataSet` class is used to create datasets for machine learning or for the evaluation of noise reduction algorithms.
 
-```python 
+```python
     from uw_sim.audio_simulator import DataSet
 
     dataset = DataSet(
@@ -61,11 +61,9 @@ The `DataSet` class is used to create datasets for machine learning or for the e
     print(df)
 ```
 
-## Demo 
+## Demo
 
 You can find a demo notebook in the `demo` directory:
 ```
 demo/demo.ipynb
 ```
-
-
