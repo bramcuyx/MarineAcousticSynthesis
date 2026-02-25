@@ -14,13 +14,14 @@ soundfile = ">=0.10.3"
 pandas = ">=1.3.0"
 scipy = ">=1.7.0"
 matplotlib = ">=3.4.0"
-plotandfilter = { git = "https://gitlab.vliz.be/research/plotandfilter.git", branch = "main" }
+plotandfilter = { git = "git@gitlab.vliz.be:research/plotandfilter.git", branch = "main" }
 llvmlite = "^0.44.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
+black = {extras = ["jupyter"], version = "^26.1.0"}
 ipykernel = "^6.29.5"
 ipympl = "^0.9.6"
+isort = "^8.0.0"
 
 
 [build-system]

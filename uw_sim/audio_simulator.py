@@ -14,7 +14,7 @@ Classes:
 Usage:
     simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
     dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
-    
+
 Status: In development
 
 TODO: Fill a folder with the backgrounds
@@ -22,16 +22,17 @@ TODO: Fill a folder with the events
 TODO: Calculate the Masks spectrogram shaped with 256 fft bins and 128 hop length
 
 Author: Bram Cuyx
-    
+
 """
 
+import json
 import os
 import random
-import numpy as np
-import soundfile as sf
-import json
 import uuid
+
+import numpy as np
 import pandas as pd
+import soundfile as sf
 from scipy.signal import spectrogram
 
 
@@ -91,19 +92,20 @@ class Event:
         scale_to_snr(background_segment, snr): Scale the event audio to achieve the specified SNR when mixed with background.
 
     Usage:
-        event = Event(file_path, sample_rate)
+        event = Event(file_path, sample_rate, mask_folder)
         event.scale_to_snr(background_segment, snr)
 
     """
 
-    def __init__(self, file_path, sample_rate):
+    def __init__(self, file_path, sample_rate, mask_folder):
         self.audio_file = AudioFile(file_path, sample_rate)
         self.sample_rate = sample_rate
+        self.mask_folder = mask_folder
         self.start_pos = None
         self.end_pos = None
         self.scaled_data = None
         self.class_label = os.path.basename(file_path).split("_")[0]
-        self.mask = None
+        self.mask = np.load(self._get_corresponding_mask())
 
     def _get_corresponding_mask(self):
         """
@@ -164,7 +166,6 @@ class Event:
 
     def scale_to_snr(self, background_segment, snr):
         """Scale the event audio to achieve the specified SNR when mixed with background."""
-        self.mask = self._get_corresponding_mask()
 
         signal_power = self._get_event_power()
         noise_power = self._get_noise_power(background_segment)
@@ -321,7 +322,7 @@ class AudioSimulator:
 
         for _ in range(num_events):
             event_file = self._select_random_file(self.events_folder)
-            event = Event(event_file, self.sample_rate)
+            event = Event(event_file, self.sample_rate, self.mask_folder)
 
             # Trim or pad event
             event.audio_file.trim_or_pad(self.bg_length)
@@ -335,7 +336,7 @@ class AudioSimulator:
             output_audio[start_pos:end_pos] += event.scaled_data
 
             # Load and process corresponding mask
-            mask_file = self._get_corresponding_mask(event_file)
+            mask_file = event._get_corresponding_mask()
             event_mask = np.load(mask_file)  # Allow for 2d masks
 
             # Translate start_pos in samples to start_pos in spectrogram bins
