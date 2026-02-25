@@ -19,7 +19,6 @@ Status: In development
 
 TODO: Fill a folder with the backgrounds
 TODO: Fill a folder with the events
-TODO: Calculate the Masks spectrogram shaped with 256 fft bins and 128 hop length
 
 Author: Bram Cuyx
 
@@ -27,6 +26,7 @@ Author: Bram Cuyx
 
 import json
 import os
+import pathlib
 import random
 import uuid
 
@@ -38,24 +38,36 @@ from scipy.signal import spectrogram
 
 class AudioFile:
     """
-    Represents an audio file and provides methods to manipulate it.
+    Audio file container with utility methods for waveform length handling.
 
-    Attributes:
-        file_path (str): The path to the audio file.
-        sample_rate (int): The sampling rate of the audio file.
-        data (np.array): The audio data.
-        file_sample_rate (int): The sampling rate of the audio file.
-
-    Methods:
-        trim_or_pad(target_length): Trim or pad the audio data to the target length.
-
-    Usage:
-        audio_file = AudioFile(file_path, sample_rate)
-        audio_file.trim_or_pad(target_length)
+    Attributes
+    ----------
+    file_path : pathlib.Path
+        Path to the audio file on disk.
+    sample_rate : int
+        Expected sampling rate in Hz.
+    data : np.ndarray
+        Audio waveform samples.
+    file_sample_rate : int
+        Sampling rate read from the file in Hz.
 
     """
 
-    def __init__(self, file_path, sample_rate):
+    def __init__(self, file_path: pathlib.Path, sample_rate: int):
+        """
+        Load an audio file and validate its sampling rate.
+
+        Parameters
+        ----------
+        file_path : pathlib.Path
+            Path to the audio file.
+        sample_rate : int
+            Expected sampling rate in Hz.
+
+        Returns
+        -------
+        None
+        """
         self.file_path = file_path
         self.sample_rate = sample_rate
         self.data, self.file_sample_rate = sf.read(file_path)
@@ -64,8 +76,20 @@ class AudioFile:
                 f"File sampling rate ({self.file_sample_rate} Hz) does not match the specified sampling rate ({sample_rate} Hz)."
             )
 
-    def trim_or_pad(self, target_length):
-        """Trim or pad the audio data to the target length."""
+    def trim_or_pad(self, target_length: int):
+        """
+        Trim or pad the waveform to a target number of samples.
+
+        Parameters
+        ----------
+        target_length : int
+            Desired waveform length in samples.
+
+        Returns
+        -------
+        np.ndarray
+            Audio data with length equal to `target_length`.
+        """
         if len(self.data) > target_length:
             start_idx = random.randint(0, len(self.data) - target_length)
             self.data = self.data[start_idx : start_idx + target_length]
@@ -78,26 +102,48 @@ class AudioFile:
 
 class Event:
     """
-    Represents an audio event and provides methods to scale it to a specified SNR.
+    Event representation used for SNR-aware scaling and mixing.
 
-    Attributes:
-        audio_file (AudioFile): The audio file of the event.
-        start_pos (int): The start position of the event in the background.
-        end_pos (int): The end position of the event in the background.
-        scaled_data (np.array): The scaled audio data of the event.
-        class_label (str): The class label of the event.
-        mask (np.array): The mask of the event.
-
-    Methods:
-        scale_to_snr(background_segment, snr): Scale the event audio to achieve the specified SNR when mixed with background.
-
-    Usage:
-        event = Event(file_path, sample_rate, mask_folder)
-        event.scale_to_snr(background_segment, snr)
+    Attributes
+    ----------
+    audio_file : AudioFile
+        Loaded event waveform wrapper.
+    sample_rate : int
+        Sampling rate in Hz.
+    mask_folder : pathlib.Path
+        Directory containing event mask `.npy` files.
+    start_pos : int | None
+        Start index of the event in the simulated background.
+    end_pos : int | None
+        End index of the event in the simulated background.
+    scaled_data : np.ndarray | None
+        Event waveform after SNR scaling.
+    class_label : str
+        Event class name extracted from the filename.
+    mask : np.ndarray
+        Binary mask aligned with the event spectrogram.
 
     """
 
-    def __init__(self, file_path, sample_rate, mask_folder):
+    def __init__(
+        self, file_path: pathlib.Path, sample_rate: int, mask_folder: pathlib.Path
+    ):
+        """
+        Initialize an event wrapper and load its corresponding mask.
+
+        Parameters
+        ----------
+        file_path : pathlib.Path
+            Path to the event audio file.
+        sample_rate : int
+            Sampling rate in Hz.
+        mask_folder : pathlib.Path
+            Directory containing event mask `.npy` files.
+
+        Returns
+        -------
+        None
+        """
         self.audio_file = AudioFile(file_path, sample_rate)
         self.sample_rate = sample_rate
         self.mask_folder = mask_folder
@@ -109,13 +155,17 @@ class Event:
 
     def _get_corresponding_mask(self):
         """
-        Get the corresponding mask file for the given event file.
+        Resolve the mask path corresponding to the current event file.
 
-        Args:
-            event_file (str): The path to the event file.
+        Returns
+        -------
+        str
+            Path to the matching mask file.
 
-        Returns:
-            str: The path to the mask file.
+        Raises
+        ------
+        FileNotFoundError
+            If no matching mask file exists in `self.mask_folder`.
         """
         event_name = os.path.splitext(os.path.basename(self.audio_file.file_path))[0]
         mask_file = os.path.join(self.mask_folder, f"{event_name}.npy")
@@ -127,45 +177,69 @@ class Event:
 
     ## get Noise and signal power in the spectrogram domain
 
-    def _get_spectrogram(self, data):
+    def _get_spectrogram(self, data: np.ndarray):
         """
-        Get the spectrogram of the audio data.
+        Compute a spectrogram representation of input audio.
 
-        Args:
-            data (np.array): The audio data.
+        Parameters
+        ----------
+        data : np.ndarray
+            Time-domain audio waveform.
 
-        Returns:
-            np.array: The noise spectrogram.
+        Returns
+        -------
+        np.ndarray
+            Spectrogram values produced by `scipy.signal.spectrogram`.
         """
         __, __, Sxx = spectrogram(data, fs=self.sample_rate, nperseg=256, noverlap=128)
         return Sxx
 
     def _get_event_power(self):
         """
-        Get the power of the event audio in the spectrogram domain, where mask is 1.
+        Estimate event power in the spectrogram domain.
 
-        Returns:
-            float: The power of the event audio.
+        Returns
+        -------
+        float
+            Mean squared spectrogram energy where `self.mask` is true.
         """
         Sxx = self._get_spectrogram(self.audio_file.data)
 
         return np.mean(Sxx**2, where=self.mask)
 
-    def _get_noise_power(self, background_segment):
+    def _get_noise_power(self, background_segment: np.ndarray):
         """
-        Get the power of the noise in the spectrogram domain, where mask is 1.
+        Estimate background power in the spectrogram domain.
 
-        Args:
-            background_segment (np.array): The background segment.
+        Parameters
+        ----------
+        background_segment : np.ndarray
+            Background audio segment aligned with the event duration.
 
-        Returns:
-            float: The power of the noise.
+        Returns
+        -------
+        float
+            Mean squared spectrogram energy where `self.mask` is true.
         """
         noise_spectrogram = self._get_spectrogram(background_segment)
         return np.mean(noise_spectrogram**2, where=self.mask)
 
-    def scale_to_snr(self, background_segment, snr):
-        """Scale the event audio to achieve the specified SNR when mixed with background."""
+    def scale_to_snr(self, background_segment: np.ndarray, snr: float):
+        """
+        Scale event audio to a target SNR against a background segment.
+
+        Parameters
+        ----------
+        background_segment : np.ndarray
+            Background segment used as the noise reference.
+        snr : float
+            Target signal-to-noise ratio in dB.
+
+        Returns
+        -------
+        None
+            The scaled waveform is stored in `self.scaled_data`.
+        """
 
         signal_power = self._get_event_power()
         noise_power = self._get_noise_power(background_segment)
@@ -175,25 +249,23 @@ class Event:
 
 class MetadataManager:
     """
-    Manages metadata for audio events.
+    Metadata accumulator for generated audio files and embedded events.
 
-    Attributes:
-        metadata (dict): The metadata dictionary.
-
-    Methods:
-        add_event(event, start, end): Add an event to the metadata.
-        set_global_metadata(snr, sample_rate, duration, background_file): Set global metadata.
-        save_metadata(output_path): Save metadata to a JSON file.
-
-    Usage:
-        metadata_manager = MetadataManager()
-        metadata_manager.add_event(event, start, end)
-        metadata_manager.set_global_metadata(snr, sample_rate, duration, background_file)
-        metadata_manager.save_metadata(output_path)
+    Attributes
+    ----------
+    metadata : dict
+        Dictionary containing global simulation fields and event annotations.
 
     """
 
     def __init__(self):
+        """
+        Initialize an empty metadata structure for one generated sample.
+
+        Returns
+        -------
+        None
+        """
         self.metadata = {
             "uuid": None,
             "snr": None,
@@ -203,7 +275,23 @@ class MetadataManager:
             "events": [],
         }
 
-    def add_event(self, event, start, end):
+    def add_event(self, event: Event, start: float, end: float):
+        """
+        Add one event annotation to the metadata.
+
+        Parameters
+        ----------
+        event : Event
+            Event object embedded in the simulated output.
+        start : float
+            Event start time in seconds.
+        end : float
+            Event end time in seconds.
+
+        Returns
+        -------
+        None
+        """
         self.metadata["events"].append(
             {
                 "event_file": event.audio_file.file_path,
@@ -213,7 +301,31 @@ class MetadataManager:
             }
         )
 
-    def set_global_metadata(self, snr, sample_rate, duration, background_file):
+    def set_global_metadata(
+        self,
+        snr: float,
+        sample_rate: int,
+        duration: float,
+        background_file: pathlib.Path,
+    ):
+        """
+        Set file-level metadata fields for one simulated sample.
+
+        Parameters
+        ----------
+        snr : float
+            Target signal-to-noise ratio in dB.
+        sample_rate : int
+            Sampling rate in Hz.
+        duration : float
+            Output duration in seconds.
+        background_file : pathlib.Path
+            Path to the selected background file.
+
+        Returns
+        -------
+        None
+        """
         self.metadata.update(
             {
                 "snr": snr,
@@ -224,42 +336,77 @@ class MetadataManager:
         )
 
     def save_metadata(self, output_path):
+        """
+        Save metadata as JSON to disk.
+
+        Parameters
+        ----------
+        output_path : pathlib.Path | str
+            Destination path for the metadata file.
+
+        Returns
+        -------
+        None
+        """
         with open(output_path, "w") as f:
             json.dump(self.metadata, f, indent=4)
 
 
 class AudioSimulator:
     """
-    Simulates audio files with different signal-to-noise ratios (SNR).
+    End-to-end simulator for creating mixed audio examples at a target SNR.
 
-    Attributes:
-        background_folder (str): The path to the folder containing background audio files.
-        events_folder (str): The path to the folder containing event audio files.
-        mask_folder (str): The path to the folder containing binary mask files.
-        output_folder (str): The path to the output folder.
-        sample_rate (int): The sampling rate of the audio files.
-        duration (int): The duration of the audio files in seconds.
-        bg_length (int): The length of the background audio in samples.
-        unique_id (str): A unique identifier for the simulation.
-
-    Methods:
-        _select_random_file(folder): Select a random file from the specified folder.
-        simulate_audio(snr, num_events): Simulate audio with the specified SNR and number of events.
-
-    Usage:
-        simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
-        simulator.simulate_audio(snr, num_events)
+    Attributes
+    ----------
+    background_folder : pathlib.Path
+        Directory with background `.wav` files.
+    events_folder : pathlib.Path
+        Directory with event `.wav` files.
+    mask_folder : pathlib.Path
+        Directory with event mask `.npy` files.
+    output_folder : pathlib.Path
+        Directory where generated outputs are written.
+    sample_rate : int
+        Sampling rate in Hz.
+    duration : int
+        Output duration in seconds.
+    bg_length : int
+        Output length in samples.
+    unique_id : str
+        UUID for the generated sample pair.
     """
 
     def __init__(
         self,
-        background_folder,
-        events_folder,
-        mask_folder,
-        output_folder,
-        sample_rate=48000,
-        duration=10,
+        background_folder: pathlib.Path,
+        events_folder: pathlib.Path,
+        mask_folder: pathlib.Path,
+        output_folder: pathlib.Path,
+        sample_rate: int = 48000,
+        duration: int = 10,
     ):
+        """
+        Initialize simulation settings and input/output directories.
+
+        Parameters
+        ----------
+        background_folder : pathlib.Path
+            Directory containing background `.wav` files.
+        events_folder : pathlib.Path
+            Directory containing event `.wav` files.
+        mask_folder : pathlib.Path
+            Directory containing event mask `.npy` files.
+        output_folder : pathlib.Path
+            Directory where generated outputs are written.
+        sample_rate : int, default=48000
+            Sampling rate in Hz.
+        duration : int, default=10
+            Output duration in seconds.
+
+        Returns
+        -------
+        None
+        """
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
@@ -269,34 +416,47 @@ class AudioSimulator:
         self.bg_length = int(sample_rate * duration)
         self.unique_id = str(uuid.uuid4())
 
-    def _select_random_file(self, folder):
+    def _select_random_file(self, folder: pathlib.Path) -> pathlib.Path:
         """
-        Select a random file from the specified folder.
+        Select one random `.wav` file from a directory.
 
-        Args:
-            folder (str): The path to the folder containing audio files.
+        Parameters
+        ----------
+        folder : pathlib.Path
+            Directory containing candidate audio files.
 
-        Returns:
-            str: The path to the selected file.
+        Returns
+        -------
+        pathlib.Path
+            Path to the selected audio file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If no `.wav` files are present in `folder`.
         """
         files = [
             os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".wav")
         ]
         if not files:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
-        return random.choice(files)
+        return pathlib.Path(random.choice(files))
 
-    def simulate_audio(self, snr, num_events):
+    def simulate_audio(self, snr: float, num_events: int):
         """
-        Simulate audio with the specified SNR and number of events.
+        Generate one simulated audio file and matching metadata.
 
-        Args:
-            snr (int): The signal-to-noise ratio.
-            num_events (int): The number of events to simulate.
+        Parameters
+        ----------
+        snr : float
+            Target signal-to-noise ratio in dB.
+        num_events : int
+            Number of events to embed in the background.
 
-        Returns:
-            str: The path to the output audio file.
-            str: The path to the metadata file.
+        Returns
+        -------
+        tuple[pathlib.Path, pathlib.Path]
+            Paths to the generated audio file and metadata JSON file.
         """
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
@@ -333,7 +493,7 @@ class AudioSimulator:
 
             # Scale and mix event
             event.scale_to_snr(background[start_pos:end_pos], snr)
-            output_audio[start_pos:end_pos] += event.scaled_data
+            output_audio[start_pos:end_pos] += event.scaled_data  # type: ignore
 
             # Load and process corresponding mask
             mask_file = event._get_corresponding_mask()
@@ -361,11 +521,11 @@ class AudioSimulator:
         metadata_filename = f"metadata_{shortened_uuid}.json"
 
         # Save output audio
-        output_file = os.path.join(self.output_folder, output_audio_filename)
+        output_file = self.output_folder / output_audio_filename
         sf.write(output_file, output_audio, self.sample_rate)
 
         # Save metadata
-        metadata_file = os.path.join(self.output_folder, metadata_filename)
+        metadata_file = self.output_folder / metadata_filename
         metadata_manager.save_metadata(metadata_file)
 
         return output_file, metadata_file
@@ -373,44 +533,77 @@ class AudioSimulator:
 
 class DataSet:
     """
-    Generates a dataset of simulated audio files with different signal-to-noise ratios (SNR).
+    Dataset generator for batched simulation across an SNR range.
 
-    Attributes:
-        background_folder (str): The path to the folder containing background audio files.
-        events_folder (str): The path to the folder containing event audio files.
-        mask_folder (str): The path to the folder containing binary mask files.
-        output_folder (str): The path to the output folder.
-        lowest_snr (int): The lowest SNR value.
-        highest_snr (int): The highest SNR value.
-        snr_steps (int): The SNR step size.
-        files_per_snr (int): The number of files to generate per SNR value.
-        file_length (int): The length of the audio files in seconds.
-        sample_rate (int): The sampling rate of the audio files.
-        generated_files (list): A list to store the paths of generated audio and metadata files.
-
-    Methods:
-        generate(): Generate the dataset.
-        generate_dataframe(): Generate a pandas DataFrame from the generated files.
-
-    Usage:
-        dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
-        dataset.generate()
-        df = dataset.generate_dataframe()
+    Attributes
+    ----------
+    background_folder : pathlib.Path
+        Directory with background `.wav` files.
+    events_folder : pathlib.Path
+        Directory with event `.wav` files.
+    mask_folder : pathlib.Path
+        Directory with event mask `.npy` files.
+    output_folder : pathlib.Path
+        Directory where generated outputs are written.
+    lowest_snr : float
+        Lowest SNR value in dB.
+    highest_snr : float
+        Highest SNR value in dB.
+    snr_steps : float
+        Step size between SNR values.
+    files_per_snr : int
+        Number of files generated for each SNR value.
+    file_length : int
+        Duration of each generated file in seconds.
+    sample_rate : int
+        Sampling rate in Hz.
+    generated_files : list[tuple[pathlib.Path, pathlib.Path]]
+        Generated `(audio_file, metadata_file)` pairs.
     """
 
     def __init__(
         self,
-        background_folder,
-        events_folder,
-        mask_folder,
-        output_folder,
-        lowest_snr,
-        highest_snr,
-        snr_steps,
-        files_per_snr,
-        file_length,
-        sample_rate=48000,
+        background_folder: pathlib.Path,
+        events_folder: pathlib.Path,
+        mask_folder: pathlib.Path,
+        output_folder: pathlib.Path,
+        lowest_snr: float,
+        highest_snr: float,
+        snr_steps: float,
+        files_per_snr: int,
+        file_length: int,
+        sample_rate: int = 48000,
     ):
+        """
+        Initialize dataset generation settings.
+
+        Parameters
+        ----------
+        background_folder : pathlib.Path
+            Directory containing background `.wav` files.
+        events_folder : pathlib.Path
+            Directory containing event `.wav` files.
+        mask_folder : pathlib.Path
+            Directory containing event mask `.npy` files.
+        output_folder : pathlib.Path
+            Directory where generated outputs are written.
+        lowest_snr : float
+            Minimum SNR value in dB.
+        highest_snr : float
+            Maximum SNR value in dB.
+        snr_steps : float
+            Step size between SNR values in dB.
+        files_per_snr : int
+            Number of files generated for each SNR value.
+        file_length : int
+            Duration of each generated file in seconds.
+        sample_rate : int, default=48000
+            Sampling rate in Hz.
+
+        Returns
+        -------
+        None
+        """
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
@@ -424,6 +617,14 @@ class DataSet:
         self.generated_files = []
 
     def generate(self):
+        """
+        Generate simulated files for each SNR value in the configured range.
+
+        Returns
+        -------
+        None
+            Generated file pairs are appended to `self.generated_files`.
+        """
         snr_values = np.arange(
             self.lowest_snr, self.highest_snr + self.snr_steps, self.snr_steps
         )
@@ -443,6 +644,14 @@ class DataSet:
                 self.generated_files.append((audio_file, metadata_file))
 
     def generate_dataframe(self):
+        """
+        Build a tabular representation of all generated samples.
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame with file references and metadata-derived fields.
+        """
         rows = []
         for audio_file, metadata_file in self.generated_files:
             with open(metadata_file, "r") as f:
