@@ -32,6 +32,7 @@ import uuid
 
 import numpy as np
 import pandas as pd
+import scipy.signal as signal
 import soundfile as sf
 from scipy.signal import spectrogram
 
@@ -72,9 +73,18 @@ class AudioFile:
         self.sample_rate = sample_rate
         self.data, self.file_sample_rate = sf.read(file_path)
         if self.file_sample_rate != sample_rate:
-            raise ValueError(
-                f"File sampling rate ({self.file_sample_rate} Hz) does not match the specified sampling rate ({sample_rate} Hz)."
-            )
+            if self.file_sample_rate % sample_rate == 0:
+                # Downsample by integer factor
+                number_of_samples = round(
+                    len(self.data) * float(sample_rate) / self.file_sample_rate
+                )
+                self.data = signal.resample(
+                    self.data, num=number_of_samples
+                )  # takes care of anti-aliasing
+            else:
+                raise ValueError(
+                    f"File sampling rate ({self.file_sample_rate} Hz) does not match the specified sampling rate ({sample_rate} Hz)."
+                )
 
     def trim_or_pad(self, target_length: int):
         """
@@ -335,7 +345,7 @@ class MetadataManager:
             }
         )
 
-    def save_metadata(self, output_path):
+    def save_metadata(self, output_path: pathlib.Path | str):
         """
         Save metadata as JSON to disk.
 
@@ -348,8 +358,20 @@ class MetadataManager:
         -------
         None
         """
-        with open(output_path, "w") as f:
-            json.dump(self.metadata, f, indent=4)
+
+        def _json_serializer(obj):
+            if isinstance(obj, pathlib.Path):
+                return str(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, np.generic):
+                return obj.item()
+            raise TypeError(
+                f"Object of type {type(obj).__name__} is not JSON serializable"
+            )
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(self.metadata, f, indent=4, default=_json_serializer)
 
 
 class AudioSimulator:
@@ -484,9 +506,6 @@ class AudioSimulator:
             event_file = self._select_random_file(self.events_folder)
             event = Event(event_file, self.sample_rate, self.mask_folder)
 
-            # Trim or pad event
-            event.audio_file.trim_or_pad(self.bg_length)
-
             # Randomly place the event in the background
             start_pos = random.randint(0, self.bg_length - len(event.audio_file.data))
             end_pos = start_pos + len(event.audio_file.data)
@@ -501,7 +520,9 @@ class AudioSimulator:
 
             # Translate start_pos in samples to start_pos in spectrogram bins
             start_pos_spec = start_pos // 128
-            end_pos_spec = end_pos // 128
+            end_pos_spec = (
+                start_pos_spec + event_mask.shape[1]
+            )  # Assuming mask time dimension matches event duration in spectrogram bins
 
             # Update the aggregate mask
             aggregate_mask[:, start_pos_spec:end_pos_spec] += event_mask

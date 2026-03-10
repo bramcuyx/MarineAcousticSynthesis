@@ -14,8 +14,30 @@ UW-Sim is a Python package for simulating underwater audio events and managing m
 To install the dependencies, use [Poetry](https://python-poetry.org/):
 
 ```sh
+poetry lock
 poetry install
 ```
+
+## Configuration (`config.yaml`)
+
+The project uses `config.yaml` to define input/output locations for dataset generation and simulation scripts.
+
+Current structure:
+
+```yaml
+paths:
+    background: /mnt/fscompute_shared/simulation_dataset/backgrounds
+    events: /mnt/fscompute_shared/simulation_dataset/events
+    output: /mnt/fscompute_shared/simulation_dataset/outputs
+    masks: /mnt/fscompute_shared/simulation_dataset/masks
+```
+
+Field reference:
+
+- `paths.background`: directory containing background audio files.
+- `paths.events`: directory containing foreground/event audio files.
+- `paths.output`: destination directory where generated outputs are written.
+- `paths.masks`: directory containing mask files used during generation.
 
 ## Usage
 ### AudioSimulator

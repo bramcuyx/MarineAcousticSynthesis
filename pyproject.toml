@@ -16,6 +16,7 @@ scipy = ">=1.7.0"
 matplotlib = ">=3.4.0"
 plotandfilter = { git = "git@gitlab.vliz.be:research/plotandfilter.git", branch = "main" }
 llvmlite = "^0.44.0"
+pyyaml = "6.0.3"
 
 [tool.poetry.group.dev.dependencies]
 black = {extras = ["jupyter"], version = "^26.1.0"}

@@ -1,0 +1,8 @@
+paths:
+  background: /mnt/fscompute_shared/simulation_dataset/backgrounds
+  events: /mnt/fscompute_shared/simulation_dataset/events
+  output: /mnt/fscompute_shared/simulation_dataset/outputs
+  masks: /mnt/fscompute_shared/simulation_dataset/masks
+
+dataset:
+  samplerate: 48000
