@@ -213,7 +213,7 @@ class Event:
         float
             Mean squared spectrogram energy where `self.mask` is true.
         """
-        Sxx = self._get_spectrogram(self.audio_file.data)
+        Sxx = self._get_spectrogram(self.audio_file.data)  # type: ignore
 
         return np.mean(Sxx**2, where=self.mask)
 
