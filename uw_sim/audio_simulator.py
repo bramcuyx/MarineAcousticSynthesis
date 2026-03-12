@@ -253,7 +253,7 @@ class Event:
 
         signal_power = self._get_event_power()
         noise_power = self._get_noise_power(background_segment)
-        scaling_factor = np.sqrt(noise_power / (10 ** (snr / 10)) / signal_power)
+        scaling_factor = np.sqrt(noise_power * (10 ** (snr / 10)) / signal_power)
         self.scaled_data = self.audio_file.data * scaling_factor
 
 
