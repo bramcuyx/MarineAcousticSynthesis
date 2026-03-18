@@ -176,6 +176,7 @@ def evaluate_snr_improvement(
         signal_pre[:, start : start + event_stft_length] += event_stft
         # Compute SNR before and after denoising, and calculate improvement
         # This is a placeholder for the actual SNR computation logic
+    signal_pre = signal_pre * mask
 
     signal_post = signal_pre * wiener_coef
     noise_post = noise_pre * wiener_coef

@@ -30,12 +30,12 @@ simulator = AudioSimulator(
     duration=10,
 )
 for i in range(10):
-    try:
-        output_audio, metadata_file = simulator.simulate_audio(snr=10, num_events=1)
-        print(f"Output audio file: {output_audio}")
-        print(f"Metadata file: {metadata_file}")
-    except Exception as e:
-        print(f"Error occurred while simulating audio: {e}")
+    # try:
+    output_audio, metadata_file = simulator.simulate_audio(snr=25, num_events=1)
+    print(f"Output audio file: {output_audio}")
+    print(f"Metadata file: {metadata_file}")
+    # except Exception as e:
+    #     print(f"Error occurred while simulating audio: {e}")
 # %%
 for f in output.glob("*.wav"):
     print(f"Output audio file: {f}")

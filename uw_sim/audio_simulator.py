@@ -527,7 +527,10 @@ class AudioSimulator:
             nperseg=self.NFFT,
             noverlap=self.overlap,
         )[2]
-        event_spectrogram_masked = event_spectrogram * event.mask
+        min_len = np.minimum(event_spectrogram.shape[1], event.mask.shape[1])
+        event_spectrogram_masked = (
+            event_spectrogram[:, :min_len] * event.mask[:, :min_len]
+        )
         event_audio_masked = signal.istft(
             event_spectrogram_masked,
             fs=event.sample_rate,
@@ -586,6 +589,7 @@ class AudioSimulator:
             event.scale_to_snr(background[start_pos:end_pos], snr)
             # add events in the stft domain multiply the event with the mask and add it to the output audio
             masked_event_audio = self.mask_event(event)
+            end_pos = start_pos + len(masked_event_audio)
             output_audio[start_pos:end_pos] += masked_event_audio  # type: ignore
 
             # Load and process corresponding mask
