@@ -4,6 +4,7 @@ import pathlib
 import numpy as np
 import scipy.signal as signal
 import soundfile as sf
+from noise_reduction.evaluation_metrics import SNR
 
 from uw_sim.audio_simulator import MetadataManager
 
@@ -111,6 +112,23 @@ def evaluate_snr_improvement(
         Path to the Wiener filter coefficients (denoised spectrogram).
     NFFT : int, default=256
         Number of FFT points for spectrogram computation.
+    overlap : int, default=128
+        Number of overlapping samples for spectrogram computation.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the following SNR values:
+        - SNR after denoising (float): The SNR of the denoised
+            recording in dB.
+        - SNR before denoising (float): The SNR of the original noisy
+            recording in dB.
+        - SNR after denoising (non-masked) (float): The SNR
+            of the denoised recording in dB, computed only on the
+            non-masked (background) bins.
+        - SNR before denoising (non-masked) (float): The SNR
+            of the original noisy recording in dB, computed only on the
+            non-masked (background) bins.
     """
     metadata = metadatamanager.metadata
     mask = metadata["mask"]
@@ -158,3 +176,10 @@ def evaluate_snr_improvement(
     for j in range(mask.shape[1]):
         signal_post[:, j] = signal_pre[:, j] * wiener_coef
         noise_post[:, j] = noise_pre[:, j] * wiener_coef
+
+    snr = SNR(signal_pre, noise_pre, signal_post, noise_post, mask)
+    snr_after = snr[0]
+    snr_before = snr[1]
+    snr_after_nonmasked = snr[2]
+    snr_before_nonmasked = snr[3]
+    return snr_after, snr_before, snr_after_nonmasked, snr_before_nonmasked
