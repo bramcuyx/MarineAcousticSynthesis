@@ -5,6 +5,7 @@ import numpy as np
 import scipy.signal as signal
 import soundfile as sf
 from noise_reduction.evaluation_metrics import SNR
+from numpy.testing import verbose
 
 from uw_sim.audio_simulator import MetadataManager
 
@@ -75,8 +76,8 @@ def get_wiener_coefficients(metadata):
     audio_file = pathlib.Path(metadata["output_audio_file"])
     # audio is in folder output, wiener is in folder wiener with same filename but different extension
     parent_folder = audio_file.parent.parent
-    wiener_file = parent_folder / "wiener" / audio_file.with_suffix(".npy")
-    wiener_coefficients = np.load(wiener_file)
+    npy_file = parent_folder / "filters" / audio_file.with_suffix(".npy").name
+    wiener_coefficients = np.load(npy_file)
     return wiener_coefficients
 
 
@@ -100,7 +101,10 @@ def get_denoised_audio(metadata):
 
 
 def evaluate_snr_improvement(
-    metadatamanager: MetadataManager, NFFT: int = 256, overlap: int = 128
+    metadatamanager: MetadataManager,
+    NFFT: int = 256,
+    overlap: int = 128,
+    verbose: bool = False,
 ):
     """Evaluate SNR improvement for a given metadata entry.
 
@@ -134,9 +138,9 @@ def evaluate_snr_improvement(
     mask = metadata["mask"]
     sr = metadata["sample_rate"]
     length = metadata["duration"]
-    noise_post = np.zeros_like(mask, dtype=np.float32)
-    signal_pre = np.zeros_like(mask, dtype=np.float32)
-    signal_post = np.zeros_like(mask, dtype=np.float32)
+    noise_post = np.zeros_like(mask, dtype=np.complex128)
+    signal_pre = np.zeros_like(mask, dtype=np.complex128)
+    signal_post = np.zeros_like(mask, dtype=np.complex128)
 
     signal_est = get_denoised_audio(metadata)[0]
     signal_est_stft = signal.stft(signal_est, fs=sr, nperseg=NFFT, noverlap=overlap)[2]
@@ -163,7 +167,7 @@ def evaluate_snr_improvement(
 
         event_audio_scaled = event_audio * scaling_factor
 
-        start = event["start"] * sr // overlap  # need a frame
+        start = int(event["start"] * sr // overlap)
         event_stft = signal.stft(
             event_audio_scaled, fs=sr, nperseg=NFFT, noverlap=overlap
         )[2]
@@ -173,11 +177,33 @@ def evaluate_snr_improvement(
         # Compute SNR before and after denoising, and calculate improvement
         # This is a placeholder for the actual SNR computation logic
 
-    for j in range(mask.shape[1]):
-        signal_post[:, j] = signal_pre[:, j] * wiener_coef
-        noise_post[:, j] = noise_pre[:, j] * wiener_coef
+    signal_post = signal_pre * wiener_coef
+    noise_post = noise_pre * wiener_coef
+    if verbose:
+        # plot the signal spectrogram before denoising and plot aside from that the mask
+        # plot the signal after denoising below
 
-    snr = SNR(signal_pre, noise_pre, signal_post, noise_post, mask)
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(3, 1, figsize=(10, 15))
+        ax[0].set_title("Signal spectrogram before denoising")
+        ax[0].imshow(
+            10 * np.log10(np.abs(signal_est_stft)),
+            origin="lower",
+            aspect="auto",
+            cmap="inferno",
+        )
+        ax[1].set_title("Mask")
+        ax[1].imshow(mask, origin="lower", aspect="auto", cmap="gray")
+        ax[2].set_title("Signal spectrogram after denoising")
+        ax[2].imshow(
+            10 * np.log10(np.abs(signal_post)),
+            origin="lower",
+            aspect="auto",
+            cmap="inferno",
+        )
+        plt.show()
+    snr = SNR(noise_pre, signal_pre, noise_post, signal_post, mask == 1.0)
     snr_after = snr[0]
     snr_before = snr[1]
     snr_after_nonmasked = snr[2]

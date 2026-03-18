@@ -2,11 +2,14 @@
 # %%
 import pathlib
 
+import noise_reduction.single_channel as sc
 import numpy as np
 import soundfile as sf
 import yaml
 
+from evaluation.snr import evaluate_snr_improvement
 from uw_sim.audio_simulator import AudioSimulator, DataSet, MetadataManager
+from uw_sim.denoise import process_and_save_denoised_audio
 
 config = yaml.safe_load(pathlib.Path("../config.yaml").read_text())
 PATHS = config["paths"]
@@ -14,6 +17,8 @@ backgrounds = pathlib.Path(PATHS["background"])
 events = pathlib.Path(PATHS["events"])
 masks = pathlib.Path(PATHS["masks"])
 output = pathlib.Path(PATHS["output"])
+denoised = pathlib.Path(PATHS["denoised"])
+filters = pathlib.Path(PATHS["filters"])
 
 # %%
 simulator = AudioSimulator(
@@ -24,19 +29,31 @@ simulator = AudioSimulator(
     sample_rate=48000,
     duration=10,
 )
-
-output_audio, metadata_file = simulator.simulate_audio(snr=10, num_events=1)
-print(f"Output audio file: {output_audio}")
-
-print(f"Metadata file: {metadata_file}")
+for i in range(10):
+    try:
+        output_audio, metadata_file = simulator.simulate_audio(snr=10, num_events=1)
+        print(f"Output audio file: {output_audio}")
+        print(f"Metadata file: {metadata_file}")
+    except Exception as e:
+        print(f"Error occurred while simulating audio: {e}")
 # %%
-event_dataset = events.glob("*.wav")
-for event in event_dataset:
-    data, sr = sf.read(event)
-    print(
-        f"Event: {event.name}, Sample Rate: {sr}, Duration: {len(data)/sr:.2f} seconds"
+for f in output.glob("*.wav"):
+    print(f"Output audio file: {f}")
+    print("Processing file...")
+    process_and_save_denoised_audio(
+        f,
+        output_path=output,
     )
+
 # %%
+for f in output.glob("*.json"):
+    print(f"Metadata file: {f}")
+    mdm = MetadataManager()
+    mdm.load_metadata(f)
+    snr_results = evaluate_snr_improvement(mdm, verbose=True)
+    print(f"SNR improvement results: {snr_results}")
+# %%
+
 mdm = MetadataManager()
 metadata_file = pathlib.Path(
     "/mnt/fscompute_shared/simulation_dataset/outputs/metadata_fd9ae858.json"
@@ -69,10 +86,13 @@ snr_improvement = snr_global_denoised - snr_global
 print(f"Global SNR (noisy): {snr_global} dB")
 print(f"Global SNR (denoised): {snr_global_denoised} dB")
 print(f"SNR improvement after denoising: {snr_improvement} dB")
+
 # %%
 
 test = pathlib.Path(
     "/mnt/fscompute_shared/simulation_dataset/outputs/simulated_audio_fd9ae858.wav"
 )
-test.parent.parent / "wiener"
+sc.single_channel_denoising(
+    test, method="silence", nfft=256, overlap=128, new_samplerate=48000
+)
 # %%

@@ -1518,7 +1518,7 @@ scipy = "^1.14.1"
 type = "git"
 url = "ssh://git@git.vliz.be/research/bioacoustics/noise-reduction.git"
 reference = "master"
-resolved_reference = "4b1751f4f919056ad22453d16e6436fc4ec850de"
+resolved_reference = "f1095973feb67f78f7fdc41ff6f2ba5cc8d1c074"
 
 [[package]]
 name = "numba"

@@ -28,6 +28,7 @@ import json
 import os
 import pathlib
 import random
+import time
 import uuid
 
 import numpy as np
@@ -35,6 +36,8 @@ import pandas as pd
 import scipy.signal as signal
 import soundfile as sf
 from scipy.signal import spectrogram
+
+random.seed(time.time())  # Initialize random seed based on current time
 
 
 class AudioFile:
@@ -277,7 +280,7 @@ class MetadataManager:
         None
         """
         self.metadata = {
-            "uuid": None,
+            "uuid": str(uuid.uuid4()),
             "snr": None,
             "sample_rate": None,
             "duration": None,
@@ -469,7 +472,6 @@ class AudioSimulator:
         self.sample_rate = sample_rate
         self.duration = duration
         self.bg_length = int(sample_rate * duration)
-        self.unique_id = str(uuid.uuid4())
         self.NFFT = NFFT
         self.overlap = overlap
 
@@ -529,7 +531,7 @@ class AudioSimulator:
             snr, self.sample_rate, self.duration, background_file
         )
         # Add the full unique_id to metadata
-        metadata_manager.metadata["uuid"] = self.unique_id
+        # metadata_manager.metadata["uuid"] = self.unique_id
 
         # Generate events and embed them into the background
         output_audio = background.copy()
@@ -572,7 +574,7 @@ class AudioSimulator:
         metadata_manager.metadata["mask"] = aggregate_mask
 
         # Shorten, remove dashes, and use it in filenames
-        shortened_uuid = self.unique_id.replace("-", "")[:8]
+        shortened_uuid = metadata_manager.metadata["uuid"].replace("-", "")[:8]
         output_audio_filename = f"simulated_audio_{shortened_uuid}.wav"
         metadata_filename = f"metadata_{shortened_uuid}.json"
 
