@@ -501,6 +501,41 @@ class AudioSimulator:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
         return pathlib.Path(random.choice(files))
 
+    def mask_event(self, event: Event):
+        """
+        Add one event to the output audio in the stft domain and add the corresponding mask to the aggregate mask.
+
+        Parameters
+        ----------
+        event : Event
+            The event to add.
+        start : float
+            The start time of the event in seconds.
+        end : float
+            The end time of the event in seconds.
+
+        Returns
+        -------
+        event_audio_masked: np.ndarray
+            The masked event audio to be added to the output.
+
+        """
+        # add events in the stft domain multiply the event with the mask and add it to the output audio
+        event_spectrogram = signal.stft(
+            event.scaled_data,
+            fs=event.sample_rate,
+            nperseg=self.NFFT,
+            noverlap=self.overlap,
+        )[2]
+        event_spectrogram_masked = event_spectrogram * event.mask
+        event_audio_masked = signal.istft(
+            event_spectrogram_masked,
+            fs=event.sample_rate,
+            nperseg=self.NFFT,
+            noverlap=self.overlap,
+        )[1]
+        return event_audio_masked
+
     def simulate_audio(self, snr: float, num_events: int):
         """
         Generate one simulated audio file and matching metadata.
@@ -549,7 +584,9 @@ class AudioSimulator:
 
             # Scale and mix event
             event.scale_to_snr(background[start_pos:end_pos], snr)
-            output_audio[start_pos:end_pos] += event.scaled_data  # type: ignore
+            # add events in the stft domain multiply the event with the mask and add it to the output audio
+            masked_event_audio = self.mask_event(event)
+            output_audio[start_pos:end_pos] += masked_event_audio  # type: ignore
 
             # Load and process corresponding mask
             mask_file = event._get_corresponding_mask()
