@@ -1,10 +1,12 @@
-# %% Demo of the audio simulator and dataset classes
+"""Debug script for dataset generation."""
+# %%
 import pathlib
 
+import numpy as np
 import soundfile as sf
 import yaml
 
-from uw_sim.audio_simulator import AudioSimulator, DataSet
+from uw_sim.audio_simulator import AudioSimulator, DataSet, MetadataManager
 
 config = yaml.safe_load(pathlib.Path("../config.yaml").read_text())
 PATHS = config["paths"]
@@ -13,6 +15,7 @@ events = pathlib.Path(PATHS["events"])
 masks = pathlib.Path(PATHS["masks"])
 output = pathlib.Path(PATHS["output"])
 
+# %%
 simulator = AudioSimulator(
     background_folder=backgrounds,
     events_folder=events,
@@ -34,6 +37,28 @@ for event in event_dataset:
         f"Event: {event.name}, Sample Rate: {sr}, Duration: {len(data)/sr:.2f} seconds"
     )
 # %%
+mdm = MetadataManager()
+metadata_file = pathlib.Path(
+    "/mnt/fscompute_shared/simulation_dataset/outputs/metadata_fd9ae858.json"
+)
+audio_file = pathlib.Path(
+    "/mnt/fscompute_shared/simulation_dataset/outputs/simulated_audio_fd9ae858.wav"
+)
+
+
+mdm.load_metadata(metadata_file)
+mask = mdm.metadata["mask"]
+mask = np.array(mask, dtype=bool)
+print(mask.shape)
+
+import scipy.signal as signal
+
 # %%
-str(backgrounds)
+from evaluation.snr import compute_snr
+
+recording, sr = sf.read(audio_file)
+recording = signal.stft(recording, fs=sr)[2]
+snr_global = compute_snr(recording, mask, mode="frequency")
+
+print(f"Global SNR: {snr_global} dB")
 # %%

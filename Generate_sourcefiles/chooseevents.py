@@ -1,3 +1,4 @@
+"""Script for interactively choosing events from the annotation table. This script loads the annotation table, applies a path transformation to the "Begin Path" column to create a new "Path" column, and then uses an interactive row filter to allow the user to visually inspect and select rows based on their spectrograms. The selected rows are then saved to a pickle file for later use."""
 # %%
 import datetime
 
@@ -12,6 +13,28 @@ from scipy.signal import spectrogram
 
 
 def plot_row_event(row):
+    """
+    Plot an event and some context around it in the spectrogram domain. The event is defined by the "Beg File Samp (samples)" and "End File Samp (samples)" columns in the input row, which are expected to be in samples at the original sampling rate of the audio file. The function reads the audio file specified in the "Path" column, resamples it to 48 kHz if necessary, and then extracts a segment of the audio around the event with some additional context before and after the event. It then computes and plots the spectrogram of this segment, highlighting the event region.
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A row from a pandas DataFrame containing at least the following columns:
+        - "Path": The file path to the audio file.
+        - "Beg File Samp (samples)": The starting sample index of the event in the original
+            sampling rate.
+        - "End File Samp (samples)": The ending sample index of the event in the original
+            sampling rate.
+        - "Label": A label for the event, used in the plot title.
+
+    Raises
+    ------
+    ValueError
+        If the sampling rate of the audio file is too low for resampling to 48 k
+        Hz.
+
+
+    """
     data, fs = sf.read(row["Path"])  # read the audio file and resample to 48 khz
     data_resampled = lb.resample(data, orig_sr=fs, target_sr=48000)
     if fs < 48000:
@@ -83,7 +106,7 @@ def plot_row_event(row):
     plt.show()
 
 
-def moc_path(path):
+def _moc_path(path):
     if not isinstance(path, str):
         return nan
     elif path.startswith("D:\data"):
@@ -95,7 +118,7 @@ def moc_path(path):
 
 annotation_location = "/mnt/fs_shared/onderzoek/6. Marine Observation Center/Projects/SoundLib_VLIZ2024/sound_db/sound_bpns/selection_tables/all_annotations.csv"
 df = pd.read_csv(annotation_location)
-df["Path"] = df["Begin Path"].apply(moc_path)
+df["Path"] = df["Begin Path"].apply(_moc_path)
 df = df.dropna(subset=["Path"])
 
 print(f"Loaded {len(df)} rows from {annotation_location}")

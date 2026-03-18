@@ -1,5 +1,5 @@
 """
-Audio Simulator
+Audio Simulator.
 
 This module provides classes and functions to simulate audio files with different signal-to-noise ratios (SNR).
 It includes classes to handle audio files, events, and metadata management.
@@ -250,7 +250,6 @@ class Event:
         None
             The scaled waveform is stored in `self.scaled_data`.
         """
-
         signal_power = self._get_event_power()
         noise_power = self._get_noise_power(background_segment)
         scaling_factor = np.sqrt(noise_power * (10 ** (snr / 10)) / signal_power)
@@ -283,6 +282,7 @@ class MetadataManager:
             "duration": None,
             "background_file": None,
             "events": [],
+            "mask": None,
         }
 
     def add_event(self, event: Event, start: float, end: float):
@@ -342,6 +342,7 @@ class MetadataManager:
                 "sample_rate": sample_rate,
                 "background_file": background_file,
                 "duration": duration,
+                "mask": None,
             }
         )
 
@@ -372,6 +373,33 @@ class MetadataManager:
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(self.metadata, f, indent=4, default=_json_serializer)
+
+    def load_metadata(self, input_path: pathlib.Path | str):
+        """
+        Load metadata from a JSON file.
+
+        Parameters
+        ----------
+        input_path : pathlib.Path | str
+            Path to the metadata JSON file.
+
+        Returns
+        -------
+        None
+            Loaded metadata is stored in `self.metadata`.
+        """
+        with open(input_path, "r", encoding="utf-8") as f:
+            self.metadata = json.load(f)
+
+    def print_metadata(self):
+        """
+        Print the current metadata content in a readable format.
+
+        Returns
+        -------
+        None
+        """
+        print(json.dumps(self.metadata, indent=4))
 
 
 class AudioSimulator:

@@ -14,6 +14,12 @@ repos:
     hooks:
       - id: isort
         args: [--profile=black]
+  - repo: https://github.com/PyCQA/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args: [--convention=numpy]
+        additional_dependencies: [tomli]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
