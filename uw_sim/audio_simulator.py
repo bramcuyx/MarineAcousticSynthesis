@@ -160,6 +160,7 @@ class Event:
         self.start_pos = None
         self.end_pos = None
         self.scaled_data = None
+        self.scaling_factor = None
         self.class_label = os.path.basename(file_path).split("_")[0]
         self.mask = np.load(self._get_corresponding_mask())
 
@@ -252,8 +253,8 @@ class Event:
         """
         signal_power = self._get_event_power()
         noise_power = self._get_noise_power(background_segment)
-        scaling_factor = np.sqrt(noise_power * (10 ** (snr / 10)) / signal_power)
-        self.scaled_data = self.audio_file.data * scaling_factor
+        self.scaling_factor = np.sqrt(noise_power * (10 ** (snr / 10)) / signal_power)
+        self.scaled_data = self.audio_file.data * self.scaling_factor
 
 
 class MetadataManager:
@@ -283,6 +284,7 @@ class MetadataManager:
             "background_file": None,
             "events": [],
             "mask": None,
+            "output_audio_file": None,
         }
 
     def add_event(self, event: Event, start: float, end: float):
@@ -308,6 +310,7 @@ class MetadataManager:
                 "start": start,
                 "end": end,
                 "class": event.class_label,
+                "scaling_factor": event.scaling_factor,
             }
         )
 
@@ -342,7 +345,6 @@ class MetadataManager:
                 "sample_rate": sample_rate,
                 "background_file": background_file,
                 "duration": duration,
-                "mask": None,
             }
         )
 
@@ -390,6 +392,7 @@ class MetadataManager:
         """
         with open(input_path, "r", encoding="utf-8") as f:
             self.metadata = json.load(f)
+            self.metadata["mask"] = np.array(self.metadata["mask"])
 
     def print_metadata(self):
         """
@@ -434,6 +437,8 @@ class AudioSimulator:
         output_folder: pathlib.Path,
         sample_rate: int = 48000,
         duration: int = 10,
+        NFFT: int = 256,
+        overlap: int = 128,
     ):
         """
         Initialize simulation settings and input/output directories.
@@ -465,6 +470,8 @@ class AudioSimulator:
         self.duration = duration
         self.bg_length = int(sample_rate * duration)
         self.unique_id = str(uuid.uuid4())
+        self.NFFT = NFFT
+        self.overlap = overlap
 
     def _select_random_file(self, folder: pathlib.Path) -> pathlib.Path:
         """
@@ -527,7 +534,7 @@ class AudioSimulator:
         # Generate events and embed them into the background
         output_audio = background.copy()
         aggregate_mask = np.zeros(
-            (129, len(output_audio) // 128 + 1)
+            (self.NFFT // 2 + 1, len(output_audio) // self.overlap + 1)
         )  # 129 is the number of frequency bins in the spectrogram, 128 is the hop length
 
         for _ in range(num_events):
@@ -547,7 +554,7 @@ class AudioSimulator:
             event_mask = np.load(mask_file)  # Allow for 2d masks
 
             # Translate start_pos in samples to start_pos in spectrogram bins
-            start_pos_spec = start_pos // 128
+            start_pos_spec = start_pos // self.overlap
             end_pos_spec = (
                 start_pos_spec + event_mask.shape[1]
             )  # Assuming mask time dimension matches event duration in spectrogram bins
@@ -572,6 +579,7 @@ class AudioSimulator:
         # Save output audio
         output_file = self.output_folder / output_audio_filename
         sf.write(output_file, output_audio, self.sample_rate)
+        metadata_manager.metadata["output_audio_file"] = output_file
 
         # Save metadata
         metadata_file = self.output_folder / metadata_filename
@@ -622,6 +630,7 @@ class DataSet:
         files_per_snr: int,
         file_length: int,
         sample_rate: int = 48000,
+        events_per_file: int = 1,
     ):
         """
         Initialize dataset generation settings.
@@ -664,6 +673,8 @@ class DataSet:
         self.file_length = file_length
         self.sample_rate = sample_rate
         self.generated_files = []
+        self.events_per_file = events_per_file
+        self.dataframe: pd.DataFrame | None = None
 
     def generate(self):
         """
@@ -688,19 +699,12 @@ class DataSet:
                     duration=self.file_length,
                 )
                 audio_file, metadata_file = simulator.simulate_audio(
-                    snr=snr, num_events=random.randint(1, 5)
+                    snr=snr, num_events=self.events_per_file
                 )
                 self.generated_files.append((audio_file, metadata_file))
 
     def generate_dataframe(self):
-        """
-        Build a tabular representation of all generated samples.
-
-        Returns
-        -------
-        pandas.DataFrame
-            DataFrame with file references and metadata-derived fields.
-        """
+        """Build a tabular representation of all generated samples."""
         rows = []
         for audio_file, metadata_file in self.generated_files:
             with open(metadata_file, "r") as f:
@@ -722,6 +726,7 @@ class DataSet:
             rows.append(
                 {
                     "audio_file": audio_file,
+                    "metadata_file": metadata_file,
                     "snr": snr,
                     "sample_rate": sample_rate,
                     "duration": duration,
@@ -736,4 +741,12 @@ class DataSet:
             )
 
         dataframe = pd.DataFrame(rows)
-        return dataframe
+        self.dataframe = dataframe
+
+    def save_dataframe(self, output_path: pathlib.Path | str):
+        """Save the generated dataframe to disk as a pickle file."""
+        if self.dataframe is None:
+            raise ValueError(
+                "No dataframe to save. Run `generate_dataframe()` before saving."
+            )
+        self.dataframe.to_pickle(output_path)

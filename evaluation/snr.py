@@ -1,5 +1,11 @@
 """Module for computing signal-to-noise ratio (SNR) from spectrograms and event masks."""
+import pathlib
+
 import numpy as np
+import scipy.signal as signal
+import soundfile as sf
+
+from uw_sim.audio_simulator import MetadataManager
 
 
 def compute_snr(recording: np.ndarray, mask: np.ndarray, mode="global") -> np.ndarray:
@@ -61,3 +67,94 @@ def compute_snr(recording: np.ndarray, mask: np.ndarray, mode="global") -> np.nd
         return 10 * np.log10(snr_f)
     else:
         raise ValueError("Invalid mode. Choose 'global' or 'frequency'.")
+
+
+def get_wiener_coefficients(metadata):
+    """Read the file containing the Wiener filter coefficients."""
+    audio_file = pathlib.Path(metadata["output_audio_file"])
+    # audio is in folder output, wiener is in folder wiener with same filename but different extension
+    parent_folder = audio_file.parent.parent
+    wiener_file = parent_folder / "wiener" / audio_file.with_suffix(".npy")
+    wiener_coefficients = np.load(wiener_file)
+    return wiener_coefficients
+
+
+def get_denoised_audio(metadata):
+    """Read the file containing the denoised audio.
+
+    Parameters
+    ----------
+    metadata (dict): Metadata dictionary containing information about the recording, events, and mask.
+
+    Returns
+    -------
+    tuple: A tuple containing the denoised audio waveform and its sampling rate.
+    """
+    audio_file = pathlib.Path(metadata["output_audio_file"])
+    # audio is in folder output, wiener is in folder wiener with same filename but different extension
+    parent_folder = audio_file.parent.parent
+    denoised_file = parent_folder / "denoised" / audio_file.name
+    denoised_audio, sr = sf.read(denoised_file)
+    return denoised_audio, sr
+
+
+def evaluate_snr_improvement(
+    metadatamanager: MetadataManager, NFFT: int = 256, overlap: int = 128
+):
+    """Evaluate SNR improvement for a given metadata entry.
+
+    Parameters
+    ----------
+    metadata : dict
+        Metadata dictionary containing information about the recording, events, and mask.
+    wiener : pathlib.Path
+        Path to the Wiener filter coefficients (denoised spectrogram).
+    NFFT : int, default=256
+        Number of FFT points for spectrogram computation.
+    """
+    metadata = metadatamanager.metadata
+    mask = metadata["mask"]
+    sr = metadata["sample_rate"]
+    length = metadata["duration"]
+    noise_post = np.zeros_like(mask, dtype=np.float32)
+    signal_pre = np.zeros_like(mask, dtype=np.float32)
+    signal_post = np.zeros_like(mask, dtype=np.float32)
+
+    signal_est = get_denoised_audio(metadata)[0]
+    signal_est_stft = signal.stft(signal_est, fs=sr, nperseg=NFFT, noverlap=overlap)[2]
+
+    background_path = metadata["background_file"]
+    background_audio, sr_bg = sf.read(background_path)
+    if sr_bg != sr:
+        background_audio = signal.resample(
+            background_audio, int(len(background_audio) * sr / sr_bg)
+        )
+    noise_pre = signal.stft(background_audio, fs=sr, nperseg=NFFT, noverlap=overlap)[2]
+
+    wiener_coef = get_wiener_coefficients(metadata)
+    events = metadata["events"]
+    for event in events:
+        event_path = event["event_file"]
+        scaling_factor = event["scaling_factor"]
+        event_audio, sr_event = sf.read(event_path)
+        # resample if needed
+        if sr_event != sr:
+            event_audio = signal.resample(
+                event_audio, int(len(event_audio) * sr / sr_event)
+            )
+
+        event_audio_scaled = event_audio * scaling_factor
+
+        start = event["start"] * sr // overlap  # need a frame
+        event_stft = signal.stft(
+            event_audio_scaled, fs=sr, nperseg=NFFT, noverlap=overlap
+        )[2]
+        event_stft_length = event_stft.shape[1]
+
+        signal_pre[:, start : start + event_stft_length] += event_stft
+        # Compute SNR before and after denoising, and calculate improvement
+        # This is a placeholder for the actual SNR computation logic
+
+    for j in range(mask.shape[1]):
+        signal_post[:, j] = signal_pre[:, j] * wiener_coef
+        noise_post[:, j] = noise_pre[:, j] * wiener_coef

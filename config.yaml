@@ -3,6 +3,8 @@ paths:
   events: /mnt/fscompute_shared/simulation_dataset/events
   output: /mnt/fscompute_shared/simulation_dataset/outputs
   masks: /mnt/fscompute_shared/simulation_dataset/masks
+  denoised: /mnt/fscompute_shared/simulation_dataset/denoised
+  filters: /mnt/fscompute_shared/simulation_dataset/filters
 
 dataset:
   samplerate: 48000

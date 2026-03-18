@@ -44,6 +44,9 @@ metadata_file = pathlib.Path(
 audio_file = pathlib.Path(
     "/mnt/fscompute_shared/simulation_dataset/outputs/simulated_audio_fd9ae858.wav"
 )
+denoised_audio_file = pathlib.Path(
+    "/mnt/fscompute_shared/simulation_dataset/denoised/simulated_audio_fd9ae858.wav"
+)
 
 
 mdm.load_metadata(metadata_file)
@@ -57,8 +60,19 @@ import scipy.signal as signal
 from evaluation.snr import compute_snr
 
 recording, sr = sf.read(audio_file)
+recording_denoised, _ = sf.read(denoised_audio_file)
 recording = signal.stft(recording, fs=sr)[2]
+recording_denoised = signal.stft(recording_denoised, fs=sr)[2]
 snr_global = compute_snr(recording, mask, mode="frequency")
+snr_global_denoised = compute_snr(recording_denoised, mask, mode="frequency")
+snr_improvement = snr_global_denoised - snr_global
+print(f"Global SNR (noisy): {snr_global} dB")
+print(f"Global SNR (denoised): {snr_global_denoised} dB")
+print(f"SNR improvement after denoising: {snr_improvement} dB")
+# %%
 
-print(f"Global SNR: {snr_global} dB")
+test = pathlib.Path(
+    "/mnt/fscompute_shared/simulation_dataset/outputs/simulated_audio_fd9ae858.wav"
+)
+test.parent.parent / "wiener"
 # %%
