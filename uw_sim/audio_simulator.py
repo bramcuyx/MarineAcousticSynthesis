@@ -667,13 +667,11 @@ class DataSet:
         events_folder: pathlib.Path,
         mask_folder: pathlib.Path,
         output_folder: pathlib.Path,
-        lowest_snr: float,
-        highest_snr: float,
-        snr_steps: float,
+        snr_values: list[float],
         files_per_snr: int,
         file_length: int,
-        sample_rate: int = 48000,
-        events_per_file: int = 1,
+        sample_rate: int,
+        events_per_file: list[int],
     ):
         """
         Initialize dataset generation settings.
@@ -704,14 +702,17 @@ class DataSet:
         Returns
         -------
         None
+
+        Throws
+        ------
+        ValueError
+            If `lowest_snr` is greater than `highest_snr` or if `snr_steps` is not positive.
         """
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
         self.output_folder = output_folder
-        self.lowest_snr = lowest_snr
-        self.highest_snr = highest_snr
-        self.snr_steps = snr_steps
+        self.snr_values = snr_values
         self.files_per_snr = files_per_snr
         self.file_length = file_length
         self.sample_rate = sample_rate
@@ -728,23 +729,26 @@ class DataSet:
         None
             Generated file pairs are appended to `self.generated_files`.
         """
-        snr_values = np.arange(
-            self.lowest_snr, self.highest_snr + self.snr_steps, self.snr_steps
-        )
-        for snr in snr_values:
-            for _ in range(self.files_per_snr):
-                simulator = AudioSimulator(
-                    background_folder=self.background_folder,
-                    events_folder=self.events_folder,
-                    mask_folder=self.mask_folder,
-                    output_folder=self.output_folder,
-                    sample_rate=self.sample_rate,
-                    duration=self.file_length,
-                )
-                audio_file, metadata_file = simulator.simulate_audio(
-                    snr=snr, num_events=self.events_per_file
-                )
-                self.generated_files.append((audio_file, metadata_file))
+        for n_events in self.events_per_file:
+            for snr in self.snr_values:
+                for _ in range(self.files_per_snr):
+                    simulator = AudioSimulator(
+                        background_folder=self.background_folder,
+                        events_folder=self.events_folder,
+                        mask_folder=self.mask_folder,
+                        output_folder=self.output_folder,
+                        sample_rate=self.sample_rate,
+                        duration=self.file_length,
+                    )
+                    try:
+                        audio_file, metadata_file = simulator.simulate_audio(
+                            snr=snr, num_events=n_events
+                        )
+                        self.generated_files.append((audio_file, metadata_file))
+                    except Exception as e:
+                        print(
+                            f"Error generating file for SNR {snr} dB with {n_events} events: {e}"
+                        )
 
     def generate_dataframe(self):
         """Build a tabular representation of all generated samples."""
@@ -758,7 +762,6 @@ class DataSet:
             duration = metadata.get("duration")
             background_file = metadata.get("background_file")
             events = metadata.get("events", [])
-            mask = metadata.get("mask", [])
             unique_id = metadata.get("uuid", "")
 
             event_files = [event.get("event_file") for event in events]
@@ -778,11 +781,9 @@ class DataSet:
                     "event_starts": event_starts,
                     "event_ends": event_ends,
                     "event_classes": event_classes,
-                    "mask": mask,
                     "uuid": unique_id,
                 }
             )
-
         dataframe = pd.DataFrame(rows)
         self.dataframe = dataframe
 

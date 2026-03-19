@@ -5,6 +5,13 @@ paths:
   masks: /mnt/fscompute_shared/simulation_dataset/masks
   denoised: /mnt/fscompute_shared/simulation_dataset/denoised
   filters: /mnt/fscompute_shared/simulation_dataset/filters
+  datasets: /mnt/fscompute_shared/simulation_dataset/datasets
 
 dataset:
   samplerate: 48000
+  duration: 10
+  snr_values: [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20]
+  num_files_per_snr: 100
+  num_events_per_file: [0,1]
+  num_workers: 4
+  dataframe_name: 20260319_dataset.pkl
