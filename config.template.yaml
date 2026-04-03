@@ -1,0 +1,23 @@
+paths:
+  background: /path/to/backgrounds
+  events: /path/to/events
+  output: /path/to/outputs
+  masks: /path/to/masks
+  denoised: /path/to/denoised
+  filters: /path/to/filters
+  datasets: /path/to/datasets
+
+dataset:
+  samplerate: 48000
+  duration: 10
+  snr_values: [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20]
+  num_files_per_snr: 100
+  num_events_per_file: [0, 1]
+  dataframe_name: dataset.pkl
+  bacpipe_buffer_length: 1
+  bacpipe_annotations_name: annotations.csv
+  denoise_processes: 12
+
+denoise_parameters:
+  Xi: 0.20
+  beta: 0.97

@@ -501,6 +501,44 @@ class AudioSimulator:
             raise FileNotFoundError(f"No .wav files found in {folder}.")
         return pathlib.Path(random.choice(files))
 
+    def mask_event(self, event: Event):
+        """
+        Add one event to the output audio in the stft domain and add the corresponding mask to the aggregate mask.
+
+        Parameters
+        ----------
+        event : Event
+            The event to add.
+        start : float
+            The start time of the event in seconds.
+        end : float
+            The end time of the event in seconds.
+
+        Returns
+        -------
+        event_audio_masked: np.ndarray
+            The masked event audio to be added to the output.
+
+        """
+        # add events in the stft domain multiply the event with the mask and add it to the output audio
+        event_spectrogram = signal.stft(
+            event.scaled_data,
+            fs=event.sample_rate,
+            nperseg=self.NFFT,
+            noverlap=self.overlap,
+        )[2]
+        min_len = np.minimum(event_spectrogram.shape[1], event.mask.shape[1])
+        event_spectrogram_masked = (
+            event_spectrogram[:, :min_len] * event.mask[:, :min_len]
+        )
+        event_audio_masked = signal.istft(
+            event_spectrogram_masked,
+            fs=event.sample_rate,
+            nperseg=self.NFFT,
+            noverlap=self.overlap,
+        )[1]
+        return event_audio_masked
+
     def simulate_audio(self, snr: float, num_events: int):
         """
         Generate one simulated audio file and matching metadata.
@@ -549,7 +587,10 @@ class AudioSimulator:
 
             # Scale and mix event
             event.scale_to_snr(background[start_pos:end_pos], snr)
-            output_audio[start_pos:end_pos] += event.scaled_data  # type: ignore
+            # add events in the stft domain multiply the event with the mask and add it to the output audio
+            masked_event_audio = self.mask_event(event)
+            end_pos = start_pos + len(masked_event_audio)
+            output_audio[start_pos:end_pos] += masked_event_audio  # type: ignore
 
             # Load and process corresponding mask
             mask_file = event._get_corresponding_mask()
@@ -626,13 +667,11 @@ class DataSet:
         events_folder: pathlib.Path,
         mask_folder: pathlib.Path,
         output_folder: pathlib.Path,
-        lowest_snr: float,
-        highest_snr: float,
-        snr_steps: float,
+        snr_values: list[float],
         files_per_snr: int,
         file_length: int,
-        sample_rate: int = 48000,
-        events_per_file: int = 1,
+        sample_rate: int,
+        events_per_file: list[int],
     ):
         """
         Initialize dataset generation settings.
@@ -663,14 +702,17 @@ class DataSet:
         Returns
         -------
         None
+
+        Throws
+        ------
+        ValueError
+            If `lowest_snr` is greater than `highest_snr` or if `snr_steps` is not positive.
         """
         self.background_folder = background_folder
         self.events_folder = events_folder
         self.mask_folder = mask_folder
         self.output_folder = output_folder
-        self.lowest_snr = lowest_snr
-        self.highest_snr = highest_snr
-        self.snr_steps = snr_steps
+        self.snr_values = snr_values
         self.files_per_snr = files_per_snr
         self.file_length = file_length
         self.sample_rate = sample_rate
@@ -687,23 +729,26 @@ class DataSet:
         None
             Generated file pairs are appended to `self.generated_files`.
         """
-        snr_values = np.arange(
-            self.lowest_snr, self.highest_snr + self.snr_steps, self.snr_steps
-        )
-        for snr in snr_values:
-            for _ in range(self.files_per_snr):
-                simulator = AudioSimulator(
-                    background_folder=self.background_folder,
-                    events_folder=self.events_folder,
-                    mask_folder=self.mask_folder,
-                    output_folder=self.output_folder,
-                    sample_rate=self.sample_rate,
-                    duration=self.file_length,
-                )
-                audio_file, metadata_file = simulator.simulate_audio(
-                    snr=snr, num_events=self.events_per_file
-                )
-                self.generated_files.append((audio_file, metadata_file))
+        for n_events in self.events_per_file:
+            for snr in self.snr_values:
+                for _ in range(self.files_per_snr):
+                    simulator = AudioSimulator(
+                        background_folder=self.background_folder,
+                        events_folder=self.events_folder,
+                        mask_folder=self.mask_folder,
+                        output_folder=self.output_folder,
+                        sample_rate=self.sample_rate,
+                        duration=self.file_length,
+                    )
+                    try:
+                        audio_file, metadata_file = simulator.simulate_audio(
+                            snr=snr, num_events=n_events
+                        )
+                        self.generated_files.append((audio_file, metadata_file))
+                    except Exception as e:
+                        print(
+                            f"Error generating file for SNR {snr} dB with {n_events} events: {e}"
+                        )
 
     def generate_dataframe(self):
         """Build a tabular representation of all generated samples."""
@@ -717,7 +762,6 @@ class DataSet:
             duration = metadata.get("duration")
             background_file = metadata.get("background_file")
             events = metadata.get("events", [])
-            mask = metadata.get("mask", [])
             unique_id = metadata.get("uuid", "")
 
             event_files = [event.get("event_file") for event in events]
@@ -737,11 +781,9 @@ class DataSet:
                     "event_starts": event_starts,
                     "event_ends": event_ends,
                     "event_classes": event_classes,
-                    "mask": mask,
                     "uuid": unique_id,
                 }
             )
-
         dataframe = pd.DataFrame(rows)
         self.dataframe = dataframe
 

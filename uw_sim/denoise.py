@@ -11,6 +11,7 @@ from noise_reduction import single_channel as sc
 def process_and_save_denoised_audio(
     wav_path: pathlib.Path,
     output_path: pathlib.Path,
+    wiener_path: pathlib.Path,
     verbose: bool = False,
     method="silence",
     **kwargs,
@@ -42,8 +43,8 @@ def process_and_save_denoised_audio(
     )
     # Save the denoised audio
 
-    wiener_file = output_path.parent / "filters" / (wav_path.stem + ".npy")
-    output_file = output_path.parent / "denoised" / (wav_path.stem + ".wav")
+    wiener_file = wiener_path / (wav_path.stem + ".npy")
+    output_file = output_path / (wav_path.stem + ".wav")
     # Inverse STFT to get the time domain signal
     _, denoised_audio = signal.istft(
         signal_estimate,
