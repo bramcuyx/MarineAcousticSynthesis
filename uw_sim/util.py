@@ -1,10 +1,15 @@
 """Utility functions for the UW-Sim project."""
 
+import pathlib
+
 import pandas as pd
 
 
 def write_bacpipe_annotations(
-    dataframe_path: str, buffer: int = 1
+    dataframe_path: str,
+    denoised_path: pathlib.Path,
+    buffer: int = 1,
+    annot_name: str = "denoised_annotations.csv",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Write bacpipe annotations to a CSV file.
@@ -15,6 +20,8 @@ def write_bacpipe_annotations(
         Path to the DataFrame to be written.
     buffer : int
         Buffer time in seconds to add around each event.
+    denoised_path : str, optional
+        Path to the denoised audio files.
 
     Returns
     -------
@@ -79,14 +86,39 @@ def write_bacpipe_annotations(
     # form denoise filepath, parentfolder is replaced from output to denoised, filename is the same
     output_denoised_df = output_df.copy()
     for i, row in output_df.iterrows():
-        audio_path = str(row["audiofilename"])
-        denoised_path = audio_path.replace("outputs", "denoised")
-        output_denoised_df.at[i, "audiofilename"] = denoised_path
+        audio_path = pathlib.Path(row["audiofilename"])
+        filename = audio_path.name
+        file_path = denoised_path / filename
+        output_denoised_df.at[i, "audiofilename"] = file_path
 
     dataframe_path_str = str(dataframe_path)
     output_csv_path = dataframe_path_str.replace(".pkl", ".csv")
-    output_denoised_path = dataframe_path_str.replace(".pkl", "_denoised.csv")
+    output_denoised_path = dataframe_path_str.replace(".pkl", f"_{annot_name}")
 
     output_df.to_csv(output_csv_path, index=False, sep=",")
     output_denoised_df.to_csv(output_denoised_path, index=False, sep=",")
     return output_df, output_denoised_df
+
+
+def snr_to_dat(SNR_csv_path: pathlib.Path, output_dat_path: pathlib.Path) -> None:
+    """
+    Convert SNR results from a CSV file to a DAT file.
+
+    Parameters
+    ----------
+    SNR_csv_path : pathlib.Path
+        Path to the input CSV file containing SNR results.
+    output_dat_path : pathlib.Path
+        Path to the output DAT file to be created.
+    """
+    df = pd.read_csv(SNR_csv_path)
+    grouped = (
+        df.groupby("target_snr", as_index=False)
+        .agg(
+            mean_improvement=("snr_improvement", "mean"),
+            std_improvement=("snr_improvement", "std"),
+            count=("snr_improvement", "size"),
+        )
+        .sort_values("target_snr")
+    )
+    grouped.to_csv(output_dat_path, sep=" ", index=False, float_format="%.6f")
