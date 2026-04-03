@@ -13,8 +13,8 @@ PATHS = config["paths"]
 output = pathlib.Path(PATHS["output"])
 denoised_output = pathlib.Path(PATHS["denoised"])
 wiener_output = pathlib.Path(PATHS["filters"])
-Xi = config.get("dataset", {}).get("Xi", 0.20)
-beta = config.get("dataset", {}).get("beta", 0.97)
+Xi = config.get("denoise_parameters", {}).get("Xi", 0.20)
+beta = config.get("denoise_parameters", {}).get("beta", 0.97)
 
 wav_files = sorted(output.glob("*.wav"))
 num_processes = config.get("dataset", {}).get("denoise_processes") or (

@@ -8,8 +8,9 @@ import pandas as pd
 def write_bacpipe_annotations(
     dataframe_path: str,
     denoised_path: pathlib.Path,
+    output_path: pathlib.Path | None = None,
     buffer: int = 1,
-    annot_name: str = "denoised_annotations.csv",
+    annot_name: str = "annotations.csv",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Write bacpipe annotations to a CSV file.
@@ -22,6 +23,9 @@ def write_bacpipe_annotations(
         Buffer time in seconds to add around each event.
     denoised_path : str, optional
         Path to the denoised audio files.
+    output_path : pathlib.Path | None, optional
+        Path to the original audio files. If not provided, this is inferred from
+        the first row in the dataframe.
 
     Returns
     -------
@@ -92,8 +96,14 @@ def write_bacpipe_annotations(
         output_denoised_df.at[i, "audiofilename"] = file_path
 
     dataframe_path_str = str(dataframe_path)
-    output_csv_path = dataframe_path_str.replace(".pkl", ".csv")
-    output_denoised_path = dataframe_path_str.replace(".pkl", f"_{annot_name}")
+    if output_path is None:
+        if output_df.empty:
+            output_path = pathlib.Path(dataframe_path_str).parent
+        else:
+            output_path = pathlib.Path(output_df.iloc[0]["audiofilename"]).parent
+
+    output_csv_path = output_path / annot_name
+    output_denoised_path = denoised_path / annot_name
 
     output_df.to_csv(output_csv_path, index=False, sep=",")
     output_denoised_df.to_csv(output_denoised_path, index=False, sep=",")
