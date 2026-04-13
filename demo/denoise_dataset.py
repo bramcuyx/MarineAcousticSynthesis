@@ -33,7 +33,7 @@ def process_file(wav_file):
         wiener_path=wiener_output,
         Xi=Xi,
         beta=beta,
-    )  # -10dB max noise reduction
+    )  # -14dB max noise reduction
 
 
 if __name__ == "__main__":

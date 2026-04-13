@@ -205,7 +205,9 @@ class Event:
         np.ndarray
             Spectrogram values produced by `scipy.signal.spectrogram`.
         """
-        __, __, Sxx = spectrogram(data, fs=self.sample_rate, nperseg=256, noverlap=128)
+        __, __, Sxx = spectrogram(
+            data, fs=self.sample_rate, nperseg=256, mode="complex", noverlap=128
+        )
         return Sxx
 
     def _get_event_power(self):
@@ -219,7 +221,7 @@ class Event:
         """
         Sxx = self._get_spectrogram(self.audio_file.data)  # type: ignore
 
-        return np.mean(Sxx**2, where=self.mask)
+        return np.mean(np.abs(Sxx) ** 2, where=self.mask)
 
     def _get_noise_power(self, background_segment: np.ndarray):
         """
@@ -236,7 +238,7 @@ class Event:
             Mean squared spectrogram energy where `self.mask` is true.
         """
         noise_spectrogram = self._get_spectrogram(background_segment)
-        return np.mean(noise_spectrogram**2, where=self.mask)
+        return np.mean(np.abs(noise_spectrogram) ** 2, where=self.mask)
 
     def scale_to_snr(self, background_segment: np.ndarray, snr: float):
         """

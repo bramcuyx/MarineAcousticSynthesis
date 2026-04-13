@@ -44,4 +44,12 @@ chosen_rows/
 notes_meeting.md
 demo/debugdenoise.py
 config.yaml
+demo/debug.py
 Generate_sourcefiles/
+choosebackgrounds.py
+generate_snippets.ipynb
+
+*.dat
+*.png
+
+demo/debug.py

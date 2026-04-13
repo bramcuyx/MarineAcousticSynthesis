@@ -3,6 +3,7 @@
 import pathlib
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -35,7 +36,14 @@ def main() -> None:
                 snr_before,
                 snr_after_nonmasked,
                 snr_before_nonmasked,
-            ) = evaluate_snr_improvement(metadata)
+            ) = evaluate_snr_improvement(
+                metadata,
+                masked=True,
+                masked_noise=True,
+                mode="masked",
+                denoised_folder=pathlib.Path(config["paths"]["denoised"]),
+                filtered_folder=pathlib.Path(config["paths"]["filters"]),
+            )
 
             row = {
                 "metadata_file": str(metadata_file),
@@ -53,24 +61,12 @@ def main() -> None:
                 "error": "",
             }
         except Exception as exc:
-            row = {
-                "metadata_file": str(metadata_file),
-                "uuid": None,
-                "target_snr": None,
-                "snr_before": None,
-                "snr_after": None,
-                "snr_improvement": None,
-                "snr_before_nonmasked": None,
-                "snr_after_nonmasked": None,
-                "snr_improvement_nonmasked": None,
-                "status": "error",
-                "error": str(exc),
-            }
             print(f"Failed for {metadata_file.name}: {exc}")
+            continue
 
         rows.append(row)
 
-    output_csv = datasets_dir / "snr_evaluation_results.csv"
+    output_csv = datasets_dir / "snr_evaluation_results_dmasked2.csv"
     results_df = pd.DataFrame(rows)
     results_df.to_csv(output_csv, index=False)
     print(f"Saved {len(rows)} evaluation rows to {output_csv}")
@@ -119,12 +115,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # main()
     import uw_sim.util as ut
 
     ut.snr_to_dat(
         pathlib.Path(
-            "/mnt/fscompute_shared/simulation_dataset/datasets/snr_results_framed.csv"
+            "/mnt/fscompute_shared/simulation_dataset/datasets/snr_evaluation_results_dmasked2.csv"
         ),
-        pathlib.Path("snr_results_framed.dat"),
+        pathlib.Path("snr_results_framed_dmasked.dat"),
     )

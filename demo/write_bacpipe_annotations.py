@@ -31,6 +31,11 @@ def main() -> None:
         default=None,
         help="Annotation CSV filename for both output folders (overrides config).",
     )
+    parser.add_argument(
+        "--single-annotation-per-file",
+        action="store_true",
+        help="Write one 0/1 annotation row per file instead of interval annotations.",
+    )
     args = parser.parse_args()
 
     buffer = args.buffer if args.buffer is not None else default_buffer
@@ -55,6 +60,7 @@ def main() -> None:
         output_path=output_path,
         buffer=buffer,
         annot_name=annot_name,
+        single_annotation_per_file=args.single_annotation_per_file,
     )
 
     output_csv = output_path / annot_name

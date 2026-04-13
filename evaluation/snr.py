@@ -12,22 +12,23 @@ from noise_reduction.evaluation_metrics import SNR, SNR_framed
 from uw_sim.audio_simulator import MetadataManager
 
 
-def get_wiener_coefficients(metadata):
+def get_wiener_coefficients(metadata, filtered_folder):
     """Read the file containing the Wiener filter coefficients."""
     audio_file = pathlib.Path(metadata["output_audio_file"])
     # audio is in folder output, wiener is in folder wiener with same filename but different extension
     parent_folder = audio_file.parent.parent
-    npy_file = parent_folder / "filters" / audio_file.with_suffix(".npy").name
+    npy_file = filtered_folder / audio_file.with_suffix(".npy").name
     wiener_coefficients = np.load(npy_file)
     return wiener_coefficients
 
 
-def get_denoised_audio(metadata):
+def get_denoised_audio(metadata, denoised_folder):
     """Read the file containing the denoised audio.
 
     Parameters
     ----------
     metadata (dict): Metadata dictionary containing information about the recording, events, and mask.
+    denoised_folder (pathlib.Path): Name of the folder containing the denoised audio files.
 
     Returns
     -------
@@ -36,7 +37,7 @@ def get_denoised_audio(metadata):
     audio_file = pathlib.Path(metadata["output_audio_file"])
     # audio is in folder output, wiener is in folder wiener with same filename but different extension
     parent_folder = audio_file.parent.parent
-    denoised_file = parent_folder / "denoised" / audio_file.name
+    denoised_file = denoised_folder / audio_file.name
     denoised_audio, sr = sf.read(denoised_file)
     return denoised_audio, sr
 
@@ -47,7 +48,10 @@ def evaluate_snr_improvement(
     overlap: int = 128,
     verbose: bool = False,
     mode="framed",
+    denoised_folder: pathlib.Path = None,
+    filtered_folder: pathlib.Path = None,
     masked=False,
+    masked_noise=False,
 ):
     """Evaluate SNR improvement for a given metadata entry.
 
@@ -82,12 +86,11 @@ def evaluate_snr_improvement(
     metadata = metadatamanager.metadata
     mask = metadata["mask"]
     sr = metadata["sample_rate"]
-    length = metadata["duration"]
     noise_post = np.zeros_like(mask, dtype=np.complex128)
     signal_pre = np.zeros_like(mask, dtype=np.complex128)
     signal_post = np.zeros_like(mask, dtype=np.complex128)
 
-    signal_est = get_denoised_audio(metadata)[0]
+    signal_est = get_denoised_audio(metadata, denoised_folder)[0]
     signal_est_stft = signal.stft(signal_est, fs=sr, nperseg=NFFT, noverlap=overlap)[2]
 
     background_path = metadata["background_file"]
@@ -98,7 +101,7 @@ def evaluate_snr_improvement(
         )
     noise_pre = signal.stft(background_audio, fs=sr, nperseg=NFFT, noverlap=overlap)[2]
 
-    wiener_coef = get_wiener_coefficients(metadata)
+    wiener_coef = get_wiener_coefficients(metadata, filtered_folder)
     events = metadata["events"]
     for event in events:
         event_path = event["event_file"]
@@ -153,8 +156,11 @@ def evaluate_snr_improvement(
             cmap="inferno",
         )
         plt.show()
-
-    if mode == "masked" and np.any(mask == 1.0):
+    if not np.any(mask == 1.0):
+        raise ValueError(
+            "Mask contains no active bins (no events). Cannot compute masked SNR."
+        )
+    elif mode == "masked" and np.any(mask == 1.0):
         snr = SNR(noise_pre, signal_pre, noise_post, signal_post, mask == 1.0)
         snr_after = snr[0]
         snr_before = snr[1]
@@ -172,6 +178,7 @@ def evaluate_snr_improvement(
             end_frame,
             masked=masked,
             mask=mask,
+            masked_noise=masked_noise,
         )
         snr_after = snr[0]
         snr_before = snr[1]
@@ -190,6 +197,7 @@ if __name__ == "__main__":
     )
     config_data = yaml.safe_load(config.read_text())
     output_dir = pathlib.Path(config_data["paths"]["output"])
+    denoised_dir = pathlib.Path(config_data["paths"]["denoised"])
     results_output_dir = pathlib.Path(config_data["paths"]["datasets"])
     metadata_files = sorted(output_dir.glob("metadata_*.json"))
     results_list = []
@@ -204,7 +212,11 @@ if __name__ == "__main__":
             metadata_dict = metadata_manager.metadata
             if len(metadata_dict["events"]) != 0:
                 snr_results = evaluate_snr_improvement(
-                    metadata_manager, mode=mode, masked=masked, verbose=False
+                    metadata_manager,
+                    mode=mode,
+                    masked=masked,
+                    verbose=False,
+                    denoised_folder=denoised_dir,
                 )
                 if mode == "masked":
                     snr_after, snr_before, snr_after_nonmasked, snr_before_nonmasked = snr_results  # type: ignore

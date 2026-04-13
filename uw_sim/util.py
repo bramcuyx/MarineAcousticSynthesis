@@ -11,6 +11,7 @@ def write_bacpipe_annotations(
     output_path: pathlib.Path | None = None,
     buffer: int = 1,
     annot_name: str = "annotations.csv",
+    single_annotation_per_file: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Write bacpipe annotations to a CSV file.
@@ -26,6 +27,9 @@ def write_bacpipe_annotations(
     output_path : pathlib.Path | None, optional
         Path to the original audio files. If not provided, this is inferred from
         the first row in the dataframe.
+    single_annotation_per_file : bool, optional
+        If True, emit one annotation row per file with `label:event` equal to 1
+        when the file contains exactly one event, otherwise 0.
 
     Returns
     -------
@@ -36,6 +40,44 @@ def write_bacpipe_annotations(
     """
     output_df = pd.DataFrame(columns=["audiofilename", "start", "end", "label:event"])
     df = pd.read_pickle(dataframe_path)
+
+    if single_annotation_per_file:
+        for row in df.itertuples():
+            output_df = pd.concat(
+                [
+                    output_df,
+                    pd.DataFrame(
+                        [
+                            {
+                                "audiofilename": row.audio_file,
+                                "start": 0,
+                                "end": row.duration,
+                                "label:event": int(len(row.event_starts) == 1),
+                            }
+                        ]
+                    ),
+                ],
+                ignore_index=True,
+            )
+
+        output_denoised_df = output_df.copy()
+        for i, row in output_denoised_df.iterrows():
+            audio_path = pathlib.Path(row["audiofilename"])
+            output_denoised_df.at[i, "audiofilename"] = denoised_path / audio_path.name
+
+        dataframe_path_str = str(dataframe_path)
+        if output_path is None:
+            if output_df.empty:
+                output_path = pathlib.Path(dataframe_path_str).parent
+            else:
+                output_path = pathlib.Path(output_df.iloc[0]["audiofilename"]).parent
+
+        output_csv_path = output_path / annot_name
+        output_denoised_path = denoised_path / annot_name
+
+        output_df.to_csv(output_csv_path, index=False, sep=",")
+        output_denoised_df.to_csv(output_denoised_path, index=False, sep=",")
+        return output_df, output_denoised_df
 
     def _append_row(row_data: dict) -> None:
         nonlocal output_df
@@ -125,9 +167,9 @@ def snr_to_dat(SNR_csv_path: pathlib.Path, output_dat_path: pathlib.Path) -> Non
     grouped = (
         df.groupby("target_snr", as_index=False)
         .agg(
-            mean_improvement=("snr_improvement", "mean"),
-            std_improvement=("snr_improvement", "std"),
-            count=("snr_improvement", "size"),
+            mean_improvement=("snr_improvement_nonmasked", "mean"),
+            std_improvement=("snr_improvement_nonmasked", "std"),
+            count=("snr_improvement_nonmasked", "size"),
         )
         .sort_values("target_snr")
     )

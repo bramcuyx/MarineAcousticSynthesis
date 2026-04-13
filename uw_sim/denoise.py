@@ -34,13 +34,18 @@ def process_and_save_denoised_audio(
     -------
     None
     """
-    signal_estimate, wiener, _ = sc.single_channel_denoising(
+    output_path.mkdir(parents=True, exist_ok=True)
+    wiener_path.mkdir(parents=True, exist_ok=True)
+
+    denoising_result = sc.single_channel_denoising(
         wav_path,
         method=method,
         nfft=kwargs.get("nfft", 256),
         overlap=kwargs.get("overlap", 128),
         **kwargs,
     )
+    signal_estimate = denoising_result[0]
+    wiener = denoising_result[1]
     # Save the denoised audio
 
     wiener_file = wiener_path / (wav_path.stem + ".npy")
