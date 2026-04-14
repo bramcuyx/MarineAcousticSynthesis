@@ -6,7 +6,8 @@ import yaml
 
 from uw_sim.audio_simulator import DataSet
 
-config = yaml.safe_load(pathlib.Path("config.yaml").read_text())
+project_root = pathlib.Path(__file__).resolve().parents[1]
+config = yaml.safe_load((project_root / "config.yaml").read_text())
 PATHS = config["paths"]
 backgrounds = pathlib.Path(PATHS["background"])
 events = pathlib.Path(PATHS["events"])

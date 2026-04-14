@@ -31,12 +31,7 @@ def main() -> None:
         metadata = MetadataManager()
         try:
             metadata.load_metadata(metadata_file)
-            (
-                snr_after,
-                snr_before,
-                snr_after_nonmasked,
-                snr_before_nonmasked,
-            ) = evaluate_snr_improvement(
+            result = evaluate_snr_improvement(
                 metadata,
                 masked=True,
                 masked_noise=True,
@@ -44,6 +39,7 @@ def main() -> None:
                 denoised_folder=pathlib.Path(config["paths"]["denoised"]),
                 filtered_folder=pathlib.Path(config["paths"]["filters"]),
             )
+            snr_after, snr_before, snr_after_nonmasked, snr_before_nonmasked = result  # type: ignore
 
             row = {
                 "metadata_file": str(metadata_file),
@@ -115,7 +111,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     import uw_sim.util as ut
 
     ut.snr_to_dat(

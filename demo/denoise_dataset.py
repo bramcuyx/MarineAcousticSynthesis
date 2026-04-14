@@ -8,7 +8,8 @@ from tqdm import tqdm
 
 from uw_sim.denoise import process_and_save_denoised_audio
 
-config = yaml.safe_load(pathlib.Path("config.yaml").read_text())
+project_root = pathlib.Path(__file__).resolve().parents[1]
+config = yaml.safe_load((project_root / "config.yaml").read_text())
 PATHS = config["paths"]
 output = pathlib.Path(PATHS["output"])
 denoised_output = pathlib.Path(PATHS["denoised"])

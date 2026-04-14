@@ -21,7 +21,7 @@ poetry install
 ## Configuration
 
 The repository ships a template config in `config.template.yaml` that is safe to commit.
-Runtime scripts read values from `config.yaml` in the project root.
+All runtime scripts automatically locate and read `config.yaml` from the project root, regardless of the working directory.
 
 ### Setup
 
@@ -71,6 +71,8 @@ Field reference:
 - `dataset.bacpipe_buffer_length`: context buffer in seconds around events for bacpipe annotations (typically `1`).
 - `dataset.bacpipe_annotations_name`: bacpipe annotation filename (recommended: `annotations.csv`) written into both audio folders (`paths.output` and `paths.denoised`).
 - `dataset.denoise_processes`: number of worker processes used by `demo/denoise_dataset.py`.
+- `denoise_parameters.Xi`: minimum gain (spectral floor) of the Wiener filter (typical: `0.20`). Corresponds to a minimum gain of approximately -14 dB. Controls the floor of noise reduction aggressiveness.
+- `denoise_parameters.beta`: forgetting factor for recursive noise PSD averaging (typical: `0.97`). Higher values (closer to 1) result in longer smoothing time constants; β = 0.97 corresponds to ~88 ms time constant at 48 kHz. These tuning parameters strongly impact noise reduction performance; more aggressive settings typically introduce musical noise artefacts.
 
 Important denoising assumption:
 
