@@ -15,10 +15,6 @@ Usage:
     simulator = AudioSimulator(background_folder, events_folder, mask_folder, output_folder, sample_rate, duration)
     dataset = DataSet(background_folder, events_folder, mask_folder, output_folder, ...)
 
-Status: In development
-
-TODO: Fill a folder with the backgrounds
-TODO: Fill a folder with the events
 
 Author: Bram Cuyx
 

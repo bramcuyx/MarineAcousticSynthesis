@@ -18,7 +18,7 @@ Xi = config.get("denoise_parameters", {}).get("Xi", 0.20)
 beta = config.get("denoise_parameters", {}).get("beta", 0.97)
 
 wav_files = sorted(output.glob("*.wav"))
-num_processes = config.get("dataset", {}).get("denoise_processes") or (
+num_processes = config.get("denoise_parameters", {}).get("denoise_processes") or (
     os.cpu_count() or 1
 )
 print(

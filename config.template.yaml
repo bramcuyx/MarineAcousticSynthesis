@@ -16,8 +16,9 @@ dataset:
   dataframe_name: dataset.pkl
   bacpipe_buffer_length: 1
   bacpipe_annotations_name: annotations.csv
-  denoise_processes: 12
 
-denoise_parameters:
+denoise_parameters: # Only necessary if you want to denoise the dataset
   Xi: 0.20
   beta: 0.97
+  denoise_processes: 12
+
